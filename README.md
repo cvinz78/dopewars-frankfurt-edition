@@ -63,6 +63,8 @@ mit. Zurücksetzen per **Reset** (Werkseinstellungen, Highscores bleiben).
 | `README.en.md` | Englische Fassung als eigene Datei |
 | `LICENSE` | Lizenztext (GNU General Public License v3) |
 | `AGENTS.md` | Arbeitsregeln für Coding-Agents (kein Spielinhalt) |
+| `push.sh` | Skript: Commit & Push in einem Schritt (`./push.sh`) |
+| `ANLEITUNG.md` | Anleitung zum Push-Skript |
 
 Spielstände/Highscores liegen standardmäßig im Browser-Speicher (localStorage)
 und können über die Einstellungen als JSON-Datei exportiert/importiert werden.
@@ -150,6 +152,8 @@ you apply. Reset to factory defaults via **Reset** (highscores are kept).
 | `README.en.md` | English version as a separate file |
 | `LICENSE` | License text (GNU General Public License v3) |
 | `AGENTS.md` | Working rules for coding agents (no game content) |
+| `push.sh` | Script: commit & push in one step (`./push.sh`) |
+| `ANLEITUNG.md` | Manual for the push script (German) |
 
 Save games/highscores live in browser storage (localStorage) by default and can
 be exported/imported as JSON files via the settings.

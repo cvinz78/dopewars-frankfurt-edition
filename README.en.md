@@ -66,6 +66,8 @@ you apply. Reset to factory defaults via **Reset** (highscores are kept).
 | `README.en.md` | This file (English) |
 | `LICENSE` | License text (GNU General Public License v3) |
 | `AGENTS.md` | Working rules for coding agents (no game content) |
+| `push.sh` | Script: commit & push in one step (`./push.sh`) |
+| `ANLEITUNG.md` | Manual for the push script (German) |
 
 Save games/highscores live in browser storage (localStorage) by default and can
 be exported/imported as JSON files via the settings.
