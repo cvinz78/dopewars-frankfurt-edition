@@ -38,6 +38,8 @@ Datei öffnen, Namen eingeben, loslegen.
 - 8 Orte (Frankfurt, Hauptbahnhof, Stadtpark, Berlin, …) mit eigener Polizei-%
 - Waffen, Eskalations-Cops (Kok Schmidt → Kok Meyer → V-Mann), Arzt nach Kämpfen
 - 4 Farbschemata: Darkskin, BlueMoon, Creamy, Retro
+- **Für Handys optimiert** — kompakte Layouts für schmale Displays und feste
+  Aktionsleiste am unteren Bildschirmrand
 - Autosave + **Spiel fortsetzen**, Spielstand-/Highscore-/Config-Dateien (JSON)
 - Externe Datendatei für Chrome/Edge: sichert Config + Highscores + Spielstand
   automatisch in eine JSON-Datei im Spielordner
@@ -123,6 +125,8 @@ Open the file, enter your name, play.
   police-%
 - Guns, escalation cops (Kok Schmidt → Kok Meyer → Narc), doctor after fights
 - 4 color themes: Darkskin, BlueMoon, Creamy, Retro
+- **Mobile-optimized** — compact layouts for narrow screens and a fixed action
+  bar at the bottom of the screen
 - Autosave + **Resume game**, save/highscore/config files (JSON)
 - External data file for Chrome/Edge: automatically saves config + highscores +
   the running game to a JSON file in the game folder

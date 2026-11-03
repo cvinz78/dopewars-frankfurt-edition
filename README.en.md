@@ -41,6 +41,8 @@ Open the file, enter your name, play.
   police-%
 - Guns, escalation cops (Kok Schmidt → Kok Meyer → Narc), doctor after fights
 - 4 color themes: Darkskin, BlueMoon, Creamy, Retro
+- **Mobile-optimized** — compact layouts for narrow screens and a fixed action
+  bar at the bottom of the screen
 - Autosave + **Resume game**, save/highscore/config files (JSON)
 - External data file for Chrome/Edge: automatically saves config + highscores +
   the running game to a JSON file in the game folder
