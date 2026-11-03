@@ -1,0 +1,2588 @@
+<!DOCTYPE html>
+<!--
+  Dope Wars – Frankfurt Edition · dopewars.html
+  Browser-Remake des klassischen Dopewars (© Ben Webb, GNU GPL „Version 2 oder später",
+  https://github.com/benmwebb/dopewars). Auf Grundlage dieser "or later"-Option wird
+  dieser Port unter der GNU General Public License v3 veröffentlicht (siehe LICENSE).
+  Copyright (C) 2026 Frankfurt Edition
+-->
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dopewars – Frankfurt Edition</title>
+<link id="favicon" rel="icon" href="data:,">
+<script>
+/* ================= Spiel-Icon (Favicon): Hanfblatt + AK-47 (Neon) ================= */
+function leafletPath(len,wid,N){
+  N=N||16;
+  const prof=t=>Math.pow(t,0.72)*Math.pow(1-t,1.55);
+  let mp=0; for(let i=1;i<N;i++){ const p=prof(i/N); if(p>mp)mp=p; }
+  const pts=[];
+  for(let i=0;i<=N;i++){
+    const t=i/N;
+    const r=(prof(t)/mp)*wid*0.5;
+    const tri=1-Math.abs(2*((t*N)%1)-1);
+    const e=(i>0&&i<N)?r+wid*0.11*tri:r;
+    pts.push([e,-t*len]);
+  }
+  let d="M0,0 ";
+  for(let i=1;i<=N;i++) d+=`L${pts[i][0].toFixed(1)},${pts[i][1].toFixed(1)} `;
+  d+=`L0,${(-len).toFixed(1)} `;
+  for(let i=N-1;i>=0;i--) d+=`L${(-pts[i][0]).toFixed(1)},${pts[i][1].toFixed(1)} `;
+  return d+"Z";
+}
+function iconFavicon(){
+  const AK="M24,9.5 H74 V12 H24 Z M66,4.5 H69 V9.5 H66 Z M12,11.8 H58 V16.2 H12 Z M12,11.8 L0,10.5 V19 L12,16.2 Z M28,16.2 H42 L36,30 H27 Z M14,16.2 H22 L18,26 H11 Z";
+  const ang=[0,-33,33,-66,66,-95,95], ln=[1,0.92,0.92,0.8,0.8,0.62,0.62];
+  const fingers=ang.map((a,i)=>`<path d="${leafletPath(58*ln[i],13*ln[i])}" transform="rotate(${a})"/>`).join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">`+
+    `<circle cx="50" cy="50" r="47" fill="#0a0a0a" stroke="#222222" stroke-width="3"/>`+
+    `<g transform="translate(17,60) scale(0.9)" fill="#e8e8e8"><path d="${AK}"/></g>`+
+    `<g transform="translate(50,56) scale(0.82)" fill="#39ff88"><rect x="-1.6" y="0" width="3.2" height="9" rx="1"/>${fingers}</g>`+
+    `</svg>`;
+}
+(function(){
+  const l=document.getElementById("favicon");
+  if(l) l.href="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(iconFavicon());
+})();
+</script>
+<style>
+/* Farbtokens — Werte werden per Theme über JS gesetzt (siehe THEMES).
+   Keine Hex-Werte direkt hier; Grundsätze design.md: dunkel, flach,
+   keine harten Schatten, Radius 4px (Buttons/Felder) / 6px (Panels). */
+:root{
+  --bg:#1B1B1D; --panel:#222226; --elev:#2A2A2F; --elev-hover:#323238; --input:#26262B;
+  --text:#A8E6A1; --dim:#86C286; --off:#5C7A5C;
+  --accent:#7ED67E; --accent-strong:#55B855; --danger:#D96A6A; --gold:#FFE98A;
+  --border:#34343A; --sel:rgba(126,214,126,0.18); --overlay:rgba(15,15,16,0.72);
+  --scroll-track:#26262B; --scroll-handle:#55555C;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:"Consolas","Cascadia Mono","Courier New",monospace;font-size:15px}
+*{scrollbar-width:thin;scrollbar-color:var(--scroll-handle) var(--scroll-track)}
+html[data-theme="retro"] body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:99;
+  background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,transparent 1px 3px);opacity:.5}
+a{color:var(--accent)}
+h1,h2,h3{font-weight:normal;letter-spacing:.08em}
+button{font-family:inherit;font-size:14px;
+  background:var(--accent-strong);color:var(--bg);
+  border:1px solid var(--accent-strong);border-radius:4px;padding:5px 14px;
+  cursor:pointer;letter-spacing:.05em;font-weight:bold}
+button:hover:not(:disabled){filter:brightness(1.12)}
+button:active:not(:disabled){filter:brightness(.92)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+button:disabled{color:var(--off);border-color:var(--border);background:var(--elev);
+  font-weight:normal;cursor:default}
+button.amber{background:var(--accent-strong);border-color:var(--accent-strong);color:var(--bg);font-weight:bold}
+button.amber:hover:not(:disabled){background:var(--accent-strong);border-color:var(--accent-strong);filter:brightness(1.12)}
+button.warn{background:var(--danger);border-color:var(--danger);color:var(--bg);font-weight:bold}
+button.warn:hover:not(:disabled){background:var(--danger);border-color:var(--danger);filter:brightness(1.12)}
+body{-webkit-tap-highlight-color:transparent}
+button,input,select{touch-action:manipulation}
+input,select{font-family:inherit;font-size:16px;background:var(--input);color:var(--text);
+  border:1px solid var(--border);border-radius:4px;padding:6px 8px;outline:none}
+input::placeholder{color:var(--off)}
+input:focus,select:focus{border-color:var(--accent)}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:4px 6px;border-bottom:1px dashed var(--border)}
+th{color:var(--dim);font-weight:normal;font-size:13px;letter-spacing:.08em;text-transform:uppercase}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover,th.sortable.active{color:var(--accent)}
+tbody tr:hover td{background:var(--sel)}
+.num{text-align:right;white-space:nowrap}
+.hidden{display:none !important}
+::-webkit-scrollbar{width:10px;height:10px}
+::-webkit-scrollbar-track{background:var(--scroll-track)}
+::-webkit-scrollbar-thumb{background:var(--scroll-handle);border-radius:5px}
+::-webkit-scrollbar-thumb:hover{background:var(--accent-strong)}
+
+/* ===== Kopf- und Layout ===== */
+#topbar{display:flex;flex-wrap:wrap;gap:6px 22px;align-items:baseline;
+  border-bottom:1px solid var(--border);padding:10px 16px;background:var(--panel)}
+#topbar .brand{color:var(--accent);letter-spacing:.25em;margin-right:12px}
+#topbar .brand b{color:var(--danger)}
+#topbar span.dim{color:var(--dim)}
+#topbar select{font-size:12px;padding:2px 6px}
+#main{display:grid;grid-template-columns:360px 1fr;gap:16px;max-width:1240px;margin:16px auto;padding:0 16px}
+#main>div{min-width:0}
+@media (max-width:980px){#main{grid-template-columns:1fr}}
+.panel{border:1px solid var(--border);background:var(--panel);border-radius:6px;padding:12px 16px;margin-bottom:16px;min-width:0}
+.panel h3{margin:0 0 8px 0;color:var(--accent);font-size:14px;text-transform:uppercase;
+  border-bottom:1px solid var(--border);padding-bottom:5px;letter-spacing:.15em}
+#markettitle.mtrow{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+#marketcash{color:var(--text);letter-spacing:normal;font-weight:bold}
+.stat{display:flex;justify-content:space-between;padding:2px 0}
+.stat .v{color:var(--text)}
+.bar{height:10px;border:1px solid var(--border);border-radius:4px;background:var(--input);margin-top:4px}
+.bar>i{display:block;height:100%;background:var(--accent-strong)}
+.bar>i.low{background:var(--danger)}
+#log{height:190px;overflow-y:auto;font-size:13px;line-height:1.5}
+#log p{margin:0 0 2px 0;color:var(--dim)}
+#log p.good{color:var(--accent)} #log p.bad{color:var(--danger)}
+#log p.good::before{content:"» ";color:var(--dim)} #log p.bad::before{content:"» ";color:var(--dim)}
+#log p.dim::before{content:"· "}
+.deal-cheap{color:var(--deal-cheap,var(--accent))} .deal-exp{color:var(--danger)}
+#actions{display:flex;flex-wrap:wrap;gap:8px}
+#actions button{flex:1 1 30%}
+#sortbar{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+#sortbar select{font-size:13px;padding:3px 6px}
+#market td.btnrow{white-space:nowrap}
+.small{font-size:12px;color:var(--dim)}
+
+/* ===== Start / Game Over ===== */
+.screen{max-width:760px;margin:8vh auto;padding:0 16px;text-align:center}
+#title h1{font-size:56px;letter-spacing:.45em;margin:0 0 4px 0;color:var(--accent)}
+#title h1 .ls0{letter-spacing:0}
+#title h1 b{color:var(--danger)}
+#title .ticon{display:inline-block;width:1.08em;height:1.08em;vertical-align:-0.08em;margin:0 0.42em}#title .ticon svg{width:100%;height:100%;display:block}
+#title .sub{color:var(--gold);letter-spacing:.3em;text-transform:uppercase;font-size:13px;margin:0 -0.3em 34px 0}
+.themerow{margin:0 0 18px;font-size:13px;color:var(--dim)}
+.themerow select{font-size:13px;padding:3px 8px;margin-left:8px}
+.infobox{text-align:left;border:1px solid var(--border);background:var(--panel);border-radius:6px;padding:14px 18px;margin:22px 0;font-size:13px;line-height:1.7;color:var(--dim)}
+.infobox b{color:var(--text)}
+.startrow{margin:26px 0 10px}
+.startrow input{width:260px;margin-right:10px}
+table.scores{margin:8px auto;max-width:420px;color:var(--gold)}
+table.scores th{color:var(--gold)}
+
+/* ===== Modals ===== */
+#overlay{position:fixed;inset:0;background:var(--overlay);z-index:200;
+  display:flex;align-items:center;justify-content:center;padding:16px}
+#mbox{border:1px solid var(--accent);background:var(--elev);border-radius:6px;
+  max-width:560px;width:100%;padding:16px 18px}
+#mbox.fight{border-color:var(--danger)}
+#mbox h3{margin:0 0 10px 0;color:var(--accent);letter-spacing:.12em}
+#mbox.fight h3{color:var(--danger)}
+#mbox .row{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+#mbox .row button{flex:1 1 auto}
+#mbox .flist{height:170px;overflow-y:auto;border:1px solid var(--border);background:var(--bg);border-radius:4px;
+  padding:8px 10px;font-size:13px;line-height:1.55;margin:8px 0}
+#mbox .flist p{margin:0 0 3px}
+#mbox .flist p.good{color:var(--accent)} #mbox .flist p.bad{color:var(--danger)} #mbox .flist p.dim{color:var(--dim)}
+#mbox .big{font-size:20px;color:var(--text);margin:8px 0}
+#mbox table td{padding:5px 6px}
+#mbox input{width:100%;margin:6px 0}
+.amtbtns{display:flex;gap:6px;margin:6px 0;flex-wrap:wrap}
+.amtbtns button{padding:3px 10px;font-size:13px}
+.extrow{margin:14px auto 0;display:flex;gap:8px;flex-wrap:wrap;justify-content:center;align-items:center;max-width:680px}
+#mbox .extrow{max-width:none;margin:10px 0 0}
+.extstatus{flex:1 1 100%;text-align:center;color:var(--dim);font-size:12px;line-height:1.5}
+#mbox .extstatus,.extrow[style*="flex-start"] .extstatus{text-align:left;flex:1 1 100%}
+.extconnect,.extdisconnect{font-size:13px;padding:4px 10px}
+#gameover .score{font-size:30px;color:var(--accent);margin:14px 0}
+
+/* ===== Einstellungen ===== */
+#mbox.settings{max-width:720px;max-height:88vh;overflow-y:auto}
+#mbox h4{margin:16px 0 6px;color:var(--accent);font-size:13px;text-transform:uppercase;
+  letter-spacing:.12em;border-bottom:1px solid var(--border);padding-bottom:3px;
+  display:flex;justify-content:space-between;align-items:center}
+#mbox h4 .cfgadd{margin:0;padding:2px 10px;font-size:12px;letter-spacing:.02em}
+.cfggrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin:8px 0}
+.cfggrid label,.cfgitem label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:var(--dim)}
+.cfggrid input,.cfgitem input{width:100%;font-size:14px;padding:4px 6px}
+.cfgitem{border:1px solid var(--border);border-radius:4px;padding:10px 8px 8px;margin:8px 0;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:6px;position:relative}
+.cfgcheck{flex-direction:row !important;align-items:center;gap:4px;justify-content:flex-start}
+.cfgcheck input{width:auto}
+.cfgdel{position:absolute;top:5px;right:5px;background:var(--elev);border:1px solid var(--danger);
+  color:var(--danger);border-radius:50%;width:20px;height:20px;line-height:17px;text-align:center;
+  cursor:pointer;font-size:12px;padding:0}
+.cfgdel:hover{background:var(--danger);color:var(--bg)}
+.cfgadd{margin:4px 0 0}
+.cfgbtn{padding:2px 9px}
+
+/* ===== Mobil ===== */
+@media (max-width:980px){
+  #main{grid-template-columns:1fr;gap:10px;margin:10px auto;padding:0 8px}
+  #main>div{display:contents}
+  .panel{padding:10px 12px;margin-bottom:10px}
+  #invpanel{order:1} #marketpanel{order:2} #statpanel{order:3} #logpanel{order:4}
+  /* Aktionsleiste fest am unteren Displayrand — der restliche Inhalt läuft
+     darüber weg; der nötige Platz unten am Inhalt wird von syncActionPad()
+     passend zur Leistenhöhe gesetzt */
+  #actionpanel{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;
+    border-radius:0;padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px))}
+  #actionpanel h3{display:none}
+  #log{height:120px}
+  button{padding:9px 12px;font-size:14px}
+  .amtbtns button{padding:8px 12px}
+  #actions{gap:6px}
+  #actions button{flex:1 1 auto;white-space:nowrap}
+  th,td{padding:4px 4px}
+  #market td.btnrow,#market td:last-child{white-space:normal}
+  #market td.btnrow button,#market td:last-child button{padding:6px 8px;font-size:13px;margin:2px 0}
+  #inv td:last-child button{padding:6px 10px;font-size:13px}
+  #topbar{gap:4px 14px;font-size:13px;padding:8px 12px}
+  #topbar button{padding:7px 10px;font-size:13px}
+  #topbar .brand{display:none}
+  #title h1{font-size:34px;letter-spacing:.3em}
+  .startrow input{width:min(260px,70vw)}
+  #mbox{max-height:92vh;overflow-y:auto}
+}
+/* Sehr schmale Displays (Telefone bis 480px) — alles etwas kompakter */
+@media (max-width:480px){
+  html,body{font-size:14px}
+  button{padding:8px 10px;font-size:13px}
+  input,select{font-size:14px;padding:5px 6px}
+  #main{gap:8px;padding:0 6px}
+  .panel{padding:9px 10px;margin-bottom:9px}
+  .panel h3{font-size:13px}
+  th{font-size:12px}
+  #market td.btnrow button{padding:6px 7px;font-size:12px}
+  #market td:last-child button{padding:6px 7px;font-size:12px}
+  #inv td:last-child button{padding:6px 8px;font-size:12px}
+  #actions button{padding:11px 6px}
+  #topbar{padding:7px 8px}
+  #title h1{font-size:26px;letter-spacing:.22em}
+  .startrow input{width:min(240px,64vw)}
+}
+</style>
+</head>
+<body>
+
+<!-- ================= STARTBILDSCHIRM ================= -->
+<div id="startscreen" class="screen">
+  <div id="title">
+    <h1>DOP<span class="ls0">E</span><span id="titleicon" class="ticon"></span><b>WAR<span class="ls0">S</span></b></h1>
+    <div class="sub">Frankfurt Edition</div>
+  </div>
+  <div class="themerow"><span id="thmlabel">Theme:</span><select class="themesel" title="Farbschema des Spiels wechseln" onchange="applyTheme(this.value)">
+    <option value="darkskin">Darkskin</option>
+    <option value="bluemoon">BlueMoon</option>
+    <option value="creamy">Creamy</option>
+    <option value="retro">Retro (Grün)</option>
+  </select><span id="appver" title="Version des Spiels"></span></div>
+  <div class="infobox" id="rulesbox">
+    <b>Die Regeln der Straße:</b> Du beginnst mit <b id="txt_cash"></b> Bargeld und
+    <b id="txt_debt"></b> Schulden beim Kredithai. Kaufe die Waren billig, reise zum nächsten
+    Ort und verkaufe sie teuer. Die Preise schwanken täglich — manchmal gibt es
+    Schnäppchen („LSD aus NL ist eingetroffen!“), manchmal explodieren die Preise,
+    weil die Bullen eine große Beschlagnahme gemacht haben.<br><br>
+    Achte auf dein <b>Guthaben bei der Bank</b>: Überfallen werden
+    nur dein Bargeld! Deine <b>Schulden</b> wachsen jeden Tag um 10% Zinsen —
+    zahl sie beim Kredithai zurück, sonst frisst dich der Zins.<br><br>
+    Die <b>Polizei</b> ist überall. Ohne Waffe kannst du nur rennen. Mit Waffen
+    kannst du dich wehren — aber wenn du einen Bullen erledigst, kommt ein
+    härterer nach. Dein <b>Mantel</b> fasst 100 Einheiten — kaufen kannst du
+    immer so viel, wie Bargeld und Platz hergeben. <b>Huren</b> tragen
+    je 10 Einheiten für dich und retten dir einmal das Leben. Du hast
+    <b id="txt_days"></b>. Sind Bargeld und Konto auf null und du hast weder
+    Waren noch Waffen, ist das <b>Spiel vorbei</b>. Dann zählt:
+    Bargeld + Konto − Schulden.
+  </div>
+  <div class="startrow" id="resumerow">
+    <button id="resumeBtn" class="amber" style="display:none" title="Zuletzt laufendes Spiel an gleicher Stelle weiterspielen" onclick="resumeGame()"></button>
+  </div>
+  <div class="startrow">
+    <input id="pname" maxlength="20" placeholder="Dein Name">
+    <button class="amber" id="btnStart" title="Neues Spiel mit Werkseinstellungen bzw. aktuellen Einstellungen beginnen" onclick="newGame()">Spiel starten</button>
+  </div>
+  <div class="startrow" style="margin-top:0">
+    <button id="btnLoadStart" title="Gespeicherten Spielstand aus einer Datei laden" onclick="loadGameFile()">📂 Spielstand laden</button>
+    <button id="btnCfgStart" title="Alle Spielwerte konfigurieren (Orte, Waren, Waffen, Polizisten …)" onclick="openSettings()">⚙ Einstellungen</button>
+  </div>
+  <div class="extrow">
+    <span class="extstatus small"></span>
+    <button id="extOpenStart" class="extconnect" title="Einstellungen und Highscores aus externer Datei laden" onclick="connectExternalOpen()">Einstellungen Laden</button>
+    <button id="extNewStart" class="extconnect" title="Neue externe Datendatei anlegen (empfohlen: im Spielordner)" onclick="connectExternalNew()">Neue Datei</button>
+    <button id="extDiscStart" class="extdisconnect" title="Verbindung zur externen Datei lösen — nichts wird gelöscht" onclick="disconnectExternal()">✕ Trennen</button>
+    <button id="extSaveStart" title="Aktuelle Config, Highscores und laufendes Spiel sofort in die externe Datei schreiben" onclick="saveExternal()">Extern Speichern</button>
+  </div>
+  <h3 class="small" style="letter-spacing:.2em;color:var(--gold)">— HALL OF FAME —</h3>
+  <div id="startscores"></div>
+</div>
+
+<!-- ================= SPIELBILDSCHIRM ================= -->
+<div id="gamescreen" class="hidden">
+  <div id="topbar"></div>
+  <div id="main">
+    <div>
+      <div class="panel" id="statpanel">
+        <h3>Status</h3>
+        <div id="stats"></div>
+      </div>
+      <div class="panel" id="invpanel">
+        <h3 id="invtitle">Inventar</h3>
+        <div id="inv"></div>
+      </div>
+      <div class="panel" id="logpanel">
+        <h3 id="logtitle">Meldungen</h3>
+        <div id="log"></div>
+      </div>
+    </div>
+    <div>
+      <div class="panel" id="marketpanel">
+        <h3 id="markettitle" class="mtrow"><span id="marketname">Markt</span><span id="marketcash" title="Bargeld"></span></h3>
+        <div id="sortbar"><span class="small" id="sortlabel">Sortieren</span>
+          <select id="sortsel" title="Markt nach Name oder Preis sortieren" onchange="setSort(this.value)">
+            <option value="name">Name A–Z</option>
+            <option value="namedown">Name Z–A</option>
+            <option value="priceup">Preis aufsteigend</option>
+            <option value="pricedown">Preis absteigend</option>
+          </select>
+        </div>
+        <div id="market"></div>
+      </div>
+      <div class="panel" id="actionpanel">
+        <h3 id="actiontitle">Aktionen</h3>
+        <div id="actions"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ================= GAME OVER ================= -->
+<div id="gameover" class="screen hidden">
+  <div id="title">
+    <h1><b>GAME OVER</b></h1>
+    <div class="sub" id="goreason"></div>
+  </div>
+  <div class="big" id="goendstand" style="font-size:16px;color:var(--dim)">Endstand</div>
+  <div class="score" id="goscore"></div>
+  <div class="startrow" id="gosaveRow">
+    <input id="goname" maxlength="20" placeholder="Dein Name">
+    <button class="amber" id="btnGoSave" title="Endstand in die Hall of Fame eintragen" onclick="saveScore()">In Highscores eintragen</button>
+  </div>
+  <div class="small" id="gonote" style="display:none"></div>
+  <div id="goscores"></div>
+  <div class="startrow" style="margin-top:0">
+    <button id="btnGoExport" onclick="exportScores()">💾 Highscores speichern</button>
+    <button id="btnGoCfg" onclick="openSettings()">⚙ Einstellungen</button>
+  </div>
+  <div class="startrow"><button class="amber" id="btnGoNew" title="Spiel neu beginnen" onclick="location.reload()">Neues Spiel</button></div>
+</div>
+
+<!-- ================= MODAL ================= -->
+<div id="overlay" class="hidden"><div id="mbox"></div></div>
+
+<script>
+"use strict";
+/* =====================================================================
+   WERKSKONFIGURATION
+   Werte fest eingebrannt aus: configs/dopewars/dopewars-config.txt
+   Im Spiel über "⚙ Einstellungen" frei änderbar; geänderte Werte werden
+   im Browser gespeichert und können als Datei exportiert/importiert
+   werden. BAKED_CFG bleibt unverändert als Rücksetz-Punkt.
+   ===================================================================== */
+const BAKED_CFG = {
+  lang: "de",                    // Sprache der Oberfläche: "de" (Standard) | "en"
+  currency: "€",                 // Currency.Symbol = "\200"
+  currencyPrefix: true,          // Currency.Prefix (Standard)
+  numTurns: 62,                  // NumTurns = 62
+  startCash: 5000,               // StartCash = 5000
+  startDebt: 5000,               // StartDebt (Standard)
+  debtInterest: 10,              // DebtInterest (Standard)
+  bankInterest: 5,               // BankInterest (Standard)
+  baseSpace: 100,                // Mantelplatz: 100 Einheiten (wie im Original)
+  bitchSpace: 10,                // Platz pro Hure
+  cheapDivide: 4,                // Drugs.CheapDivide (Standard)
+  expensiveMultiply: 4,          // Drugs.ExpensiveMultiply (Standard)
+  playerArmor: 100,              // PlayerArmor (Standard)
+  bitchArmor: 50,                // BitchArmor (Standard)
+  bitchMin: 2000,                // Bitch.MinPrice
+  bitchMax: 50000,               // Bitch.MaxPrice
+  bitchEarnMin: 20,              // Tagesverdienst pro Hure (Minimum)
+  bitchEarnMax: 2000,            // Tagesverdienst pro Hure (Maximum, 0 = aus)
+  bitchEarnCap: 10000,           // Monatsverdienst ALLER Huren (30-Tage-Block, 0 = unbegrenzt)
+
+  // Kredithai, Bank, Waffenladen und Kneipe sind von JEDEM Ort aus erreichbar
+
+  locations: [                   // Location[x].Name / .PolicePresence / .MinDrug / .MaxDrug
+    {name:"Frankfurt",    police:5,  minDrug:1, maxDrug:99},
+    {name:"Hauptbahnhof", police:5,  minDrug:1, maxDrug:99},
+    {name:"Stadtpark",    police:6,  minDrug:1, maxDrug:99},
+    {name:"Berlin",       police:10, minDrug:1, maxDrug:99},
+    {name:"Hamburg",      police:8,  minDrug:1, maxDrug:99},
+    {name:"Zeil",         police:7,  minDrug:1, maxDrug:99},
+    {name:"Ubahn",        police:5,  minDrug:1, maxDrug:99},
+    {name:"Dippemess",    police:5,  minDrug:1, maxDrug:99},
+  ],
+
+  drugs: [                       // Drug[x].Name / .MinPrice / .MaxPrice / .CheapStr
+    {name:"LSD",        min:1000,  max:4400,  cheapStr:"LSD aus NL ist eingetroffen."},
+    {name:"Kokaine",    min:15000, max:29000, cheapStr:"Ein Koks Bomber ist Abgestürzt!"},
+    {name:"Hasch",      min:480,   max:4280,  cheapStr:"Der Ananas Express ist da!"},
+    {name:"Heroin",     min:5500,  max:13000, cheapStr:"Frischer wind aus Afghanistan."},
+    {name:"Extacy",     min:1500,  max:4400,  cheapStr:"Love Parade startet!"},
+    {name:"Pilze",      min:630,   max:1300,  cheapStr:"Die Pilzsammler waren da!"},
+    {name:"Speed",      min:90,    max:250,   cheapStr:"Schnelles ist im Umlauf!"},
+    {name:"Weed",       min:315,   max:8900,  cheapStr:"Weed für Alle!!!"},
+    {name:"Medikamente",min:5,     max:99,    cheapStr:"Letzte Nacht ne Apotheke gemacht!"},
+    {name:"Crack",      min:5,     max:45000, hot:true},   // gefragt: Preis meist hoch, steigt mit Polizei
+  ],
+
+  guns: [                        // Gun[x].Name / .Price / .Space / .Damage
+    {name:"Pistole", price:300,  space:1, damage:9},
+    {name:"Revolver",price:350,  space:1, damage:11},
+    {name:"Uzi",     price:2900, space:3, damage:15},
+    {name:"AK-47",   price:3100, space:4, damage:17},
+  ],
+
+  cops: [                        // Cop[x].Name / .Armor / .DeputyArmor / .MaxDeputies
+    {name:"Kok Schmidt", armor:3, deputyArmor:3, minDep:2, maxDep:8, atkPen:30, defPen:30, gunIndex:0},
+    {name:"Kok Meyer",   armor:3, deputyArmor:3, minDep:2, maxDep:8, atkPen:30, defPen:30, gunIndex:0},
+    {name:"V-Mann",      armor:5, deputyArmor:5, minDep:2, maxDep:8, atkPen:30, defPen:30, gunIndex:0},
+  ],
+
+  names: {                       // Names.Bitch / Names.Bitches (Rest eingedeutscht)
+    bitch:"Hure", bitches:"Huren",
+    deputy:"Polizist", deputies:"Polizisten", deputyAcc:"Polizisten",
+    loanShark:"der Kredithai", bank:"die Bank",
+    gunShop:"Joes Waffenladen", pub:"die Batschkapp",
+  },
+
+  // Drugs.ExpensiveStr1/2 (Standard, eingedeutscht)
+  expensiveStr:["Die Bullen haben eine große %Tde-Beschlagnahme gemacht! Die Preise sind unverschämt!",
+                "Süchtige kaufen %Tde zu absurden Preisen!"],
+  subwaySaying:[
+    "Hey, du siehst aus wie ein Drogendealer!",
+    "Willst du eine Uhr kaufen? Ganz billig.",
+    "Die Bullen machen heute wieder Razzien, pass auf dich auf.",
+    "Ich hab gehört, in Berlin sind die Preise im Keller.",
+    "Weißt du, wo ich billig Weed bekomme?",
+    "Lauf nicht so schnell, dann lebst du länger.",
+    "Hast du mal 'nen Euro für die Bahn?",
+    "Pass auf die Schmidts und Müllers auf, die sind überall.",
+    "Auf der Dippemess ist was los diese Woche, Alter.",
+    "Geschäft läuft gut dieses Jahr, was?",
+  ],
+  stoppedTo:["ein Bier trinken","einen Joint rauchen","eine Zigarre rauchen","eine Zigarette rauchen"],
+};
+
+/* Versionsnummer des Spiels: sichtbar auf dem Startbildschirm und in den
+   Einstellungen; jeder Datei-Export schreibt sie mit hinein. Bei Änderungen
+   am Spiel anheben. */
+const APP_VERSION="2.5";
+
+/* =====================================================================
+   ZWEISPRACHIGKEIT — Deutsch ist Quellsprache (Standard), Englisch über
+   die Übersetzungstabelle EN. {0},{1},… sind Platzhalter, die E() füllt.
+   Content aus der Config (Warennamen, Meldungen, Sager) wird über
+   tc()/CONTENT_EN übersetzt — eigene, vom Nutzer geänderte Texte bleiben
+   unverändert (kein Treffer in CONTENT_EN).
+   ===================================================================== */
+const EN={
+  // Kopfleiste / Oberfläche
+  "Tag <b>{0}</b>/{1}":"Day <b>{0}</b>/{1}",
+  "Platz frei: {0}/{1}":"Space free: {0}/{1}",
+  "Bargeld":"Cash","Bankkonto":"Bank account","Schulden":"Debt","Gesundheit":"Health",
+  "Waffen":"Guns","keine":"none",
+  "Ware":"Drug","Preis":"Price","Menge":"Qty","ø bezahlt":"avg paid",
+  "Dein Mantel ist leer.":"Your coat is empty.",
+  "Markt: {0}":"Market: {0}",
+  "Hier wird heute nichts gehandelt. Reise weiter!":"Nothing is traded here today. Travel on!",
+  "Kaufen":"Buy","Verkaufen":"Sell","Abbrechen":"Cancel","Schließen":"Close","Verlassen":"Leave",
+  "Reisen":"Travel","Kredithai":"Loan shark","Bank":"Bank","Waffenladen":"Gun shop","Kneipe":"Pub",
+  "Zu einem anderen Ort reisen — kostet einen Tag":"Travel to another location — costs one day",
+  "Schulden zurückzahlen oder Geld leihen (Zinsen: {0}% pro Tag)":"Repay debt or borrow money (interest: {0}% per day)",
+  "Geld einzahlen/abheben — vor Räubern sicher, {0}% Zinsen pro Tag":"Deposit/withdraw money — safe from robbers, {0}% interest per day",
+  "Waffen kaufen und verkaufen":"Buy and sell guns",
+  "{0} anheuern — +{1} Platz, rettet einmal das Leben":"Hire a {0} — +{1} space, saves your life once",
+  "Laufendes Spiel als DW-Save-Datei speichern":"Save the running game as a DW-save file",
+  "💾 Spiel speichern":"💾 Save game",
+  "Spielstand aus Datei laden und weiterspielen — ersetzt das laufende Spiel":"Load a save file and continue — replaces the running game",
+  "📂 Spiel laden":"📂 Load game",
+  "Aktuelles Spiel beenden und neu beginnen":"End the current game and start again",
+  "✚ Neu":"✚ New",
+  "Ware wegwerfen — bringt kein Geld, Bullen-Risiko":"Throw the drug away — no money, risk of cops",
+  "{0} hier zum aktuellen Preis verkaufen":"Sell {0} here at today's price",
+  "{0} zum aktuellen Preis kaufen":"Buy {0} at today's price",
+  // Startbildschirm
+  "Spiel starten":"Start game",
+  "Neues Spiel mit Werkseinstellungen bzw. aktuellen Einstellungen beginnen":"Start a new game with factory or current settings",
+  "📂 Spielstand laden":"📂 Load save",
+  "Gespeicherten Spielstand aus einer Datei laden":"Load a saved game from a file",
+  "⚙ Einstellungen":"⚙ Settings",
+  "Alle Spielwerte konfigurieren (Orte, Waren, Waffen, Polizisten …)":"Configure all game values (locations, drugs, guns, cops …)",
+  "Dein Name":"Your name",
+  "{0} Tage":"{0} days",
+  "▶ Spiel fortsetzen — Tag {0}, {1}":"▶ Resume game — day {0}, {1}",
+  // Kaufen/Verkaufen/Wegwerfen
+  "{0} kaufen":"Buy {0}","{0} verkaufen":"Sell {0}","{0} wegwerfen":"Throw away {0}",
+  "Preis: {0}":"Price: {0}",
+  "Bargeld: {0} · Platz frei: {1} · max. {2}":"Cash: {0} · Space free: {1} · max. {2}",
+  "Bargeld: {0} · Platz frei: {1}":"Cash: {0} · Space free: {1}",
+  "Im Mantel: {0} · ø bezahlt: {1}":"In coat: {0} · avg paid: {1}",
+  "Im Mantel: {0}. Bringt kein Geld — und die Bullen sehen dich eventuell!":"In coat: {0}. Makes no money — and the cops might spot you!",
+  "Alles":"All","Max":"Max","Wegwerfen":"Throw away","Weg":"Drop",
+  "Ausgewählte Menge endgültig wegwerfen":"Throw the selected amount away for good",
+  "{0} {1} gekauft für {2}.":"Bought {0} {1} for {2}.",
+  "{0} {1} verkauft für {2}.":"Sold {0} {1} for {2}.",
+  "Du wirfst {0} {1} weg.":"You throw away {0} {1}.",
+  // Kredithai
+  "Schulden: {0}":"Debt: {0}",
+  "Bargeld: {0} · Zinsen: {1}% pro Tag":"Cash: {0} · Interest: {1}% per day",
+  "Betrag (z.B. 2500 oder 2.5k)":"Amount (e.g. 2500 or 2.5k)",
+  "Betrag (z.B. 1000 oder 1k)":"Amount (e.g. 1000 or 1k)",
+  "So viel wie möglich auf die Schulden zahlen — Achtung: kann dich auf 0 € bringen":"Pay as much debt as possible — caution: can leave you at €0",
+  "Alles bezahlen":"Pay all","Zurückzahlen":"Repay","Leihen":"Borrow",
+  "Eingegebenen Betrag auf die Schulden zahlen":"Pay the entered amount towards the debt",
+  "Geld leihen — Schulden wachsen {0}% pro Tag":"Borrow money — debt grows {0}% per day",
+  "Du hast keine Schulden mehr.":"You have no debts left.",
+  "Du hast kein Bargeld, um zu zahlen.":"You have no cash to pay.",
+  "Bitte zuerst einen Betrag eingeben (z. B. 1000 oder 1k).":"Please enter an amount first (e.g. 1000 or 1k).",
+  "Der Betrag muss größer als 0 sein.":"The amount must be greater than 0.",
+  "Du hast keine Schulden.":"You have no debt.",
+  "Schulden um {0} verringert. Restschuld: {1}.":"Debt reduced by {0}. Remaining debt: {1}.",
+  "⚠ Bestätigung":"⚠ Confirm",
+  "Du zahlst <b>{0}</b>. Danach: Restschuld <b>{1}</b>, Bargeld <b>{2}</b>":"You pay <b>{0}</b>. After that: remaining debt <b>{1}</b>, cash <b>{2}</b>",
+  " — du bist dann komplett pleite (deine {0} Einheiten Ware behältst du, mehr nicht)!":" — you will be completely broke (you keep your {0} units of drugs, but nothing more)!",
+  " — und damit wäre das <b>Spiel vorbei</b>!":" — and that would be <b>game over</b>!",
+  ". Wirklich bezahlen?":". Really pay?",
+  "Ja, bezahlen":"Yes, pay","Nein, abbrechen":"No, cancel",
+  "⚠ Achtung":"⚠ Warning",
+  "Bezahlest du <b>{0}</b>, bleibst du mit <b>€0 Bargeld</b> und <b>€0 Konto</b> zurück. Du hast immerhin noch {1} Einheiten Ware dabei — mehr aber auch nicht! Wirklich alles bezahlen?":"If you pay <b>{0}</b>, you are left with <b>€0 cash</b> and <b>€0 in the bank</b>. You still have {1} units of drugs — but nothing more! Really pay everything?",
+  "Bezahlest du <b>{0}</b>, bleibst du mit <b>€0 Bargeld</b> und <b>€0 Konto</b> zurück — und damit wäre das <b>Spiel vorbei</b>! Wirklich alles bezahlen?":"If you pay <b>{0}</b>, you are left with <b>€0 cash</b> and <b>€0 in the bank</b> — and that would be <b>game over</b>! Really pay everything?",
+  "Ja, wirklich bezahlen":"Yes, really pay","Nein, doch nicht":"No, not after all",
+  "{0} geliehen. Schulden jetzt: {1}.":"Borrowed {0}. Debt now: {1}.",
+  // Bank
+  "Kontostand: {0}":"Account balance: {0}",
+  "Bargeld: {0} · Zinsen: {1}% pro Tag · vor Räubern sicher":"Cash: {0} · Interest: {1}% per day · safe from robbers",
+  "Bargeld aufs Konto — {0}% Zinsen pro Tag, vor Räubern sicher":"Cash into the account — {0}% interest per day, safe from robbers",
+  "Einzahlen":"Deposit","Auszahlen":"Withdraw",
+  "Konto-Guthaben zurück ins Bargeld":"Move the account balance back into cash",
+  "{0} eingezahlt.":"Deposited {0}.","{0} abgehoben.":"Withdrew {0}.",
+  // Waffenladen
+  "Waffe":"Gun","Schaden":"Damage","Platz":"Space",
+  "{0} für {1} kaufen — braucht {2} Platz":"Buy {0} for {1} — needs {2} space",
+  "{0} für {1} zurückgeben":"Return {0} for {1}",
+  "Verkaufen {0}":"Sell {0}",
+  "Deine Waffen":"Your guns",
+  "{0} gekauft für {1}.":"Bought {0} for {1}.","{0} verkauft für {1}.":"Sold {0} for {1}.",
+  // Kneipe
+  "Dunkle Ecke, rauchige Luft. Eine {0} will für dich arbeiten.":"Dark corner, smoky air. A {0} wants to work for you.",
+  "Jede {0} gibt +{1} Platz und rettet dir einmal das Leben. Bargeld: {2}":"Each {0} gives +{1} space and saves your life once. Cash: {2}",
+  "Anheuern":"Hire",
+  "Du hast nicht genug Bargeld.":"You don't have enough cash.",
+  "Eine neue {0} arbeitet für dich. (+{1} Platz)":"A new {0} works for you. (+{1} space)",
+  // Reisen
+  "Wohin reisen?":"Where to travel?",
+  "Jede Reise kostet einen Tag ({0}/{1}). Du bist gerade in {2}.":"Each trip costs one day ({0}/{1}). You are currently in {2}.",
+  "Nach {0} reisen (1 Tag, Polizei: {1}%)":"Travel to {0} (1 day, police: {1}%)",
+  "Du reist nach {0}.":"You travel to {0}.",
+  "Deine {0} hat {1} eingenommen.":"Your {0} earned {1}.",
+  "Deine {0} {1} haben {2} eingenommen.":"Your {0} {1} earned {2}.",
+  "Deine {0} haben in diesem Monat (30 Tage) das Limit von {1} erreicht — heute bleibt nichts übrig.":"Your {0} reached this month's (30 days) limit of {1} — nothing left for today.",
+  "Eine Dame in der Ubahn sagt: „{0}“":"A lady on the subway says: “{0}”",
+  " (Zumindest glaubst du das.)":" (At least you believe it.)",
+  // Straßenangebote / Ereignisse
+  "Eine {0} bietet dir an, für dich zu arbeiten. Preis: {1}. Anheuern?":"A {0} offers to work for you. Price: {1}. Hire?",
+  "Die {0} arbeitet jetzt für dich. (+10 Platz)":"The {0} now works for you. (+10 space)",
+  "Ein Typ macht dir ein Angebot: {0} für {1} (Schaden {2}, Platz {3}). Kaufen?":"A guy makes you an offer: {0} for {1} (damage {2}, space {3}). Buy?",
+  "Kein Platz mehr im Mantel.":"No more space in your coat.",
+  "Du hast eine(n) {0} für {1} gekauft.":"You bought a {0} for {1}.",
+  "Du wurdest überfallen und um {0} erleichtert!":"You were mugged and relieved of {0}!",
+  "Ein alter Kumpel schenkt dir {0} {1}.":"An old buddy gives you {0} {1}.",
+  "Ein Kumpel leiht sich {0} {1} — und kommt nie wieder.":"A buddy borrows {0} {1} — and never comes back.",
+  "Streifenpolizisten haben {0} {1} fallen lassen. Einsammeln!":"Patrol officers dropped {0} {1}. Pick it up!",
+  "Du findest {0} {1} bei einem Toten in der Ubahn.":"You find {0} {1} on a dead body in the subway.",
+  "Mamas Brownies waren der Hammer! Leider haben sie {0} {1} gefressen.":"Mama's brownies were awesome! Unfortunately they ate {0} {1}.",
+  "Hier ist etwas {0}, das nach Paraquat riecht! Nehmst du es mit?":"Here is some {0} that smells of paraquat! Will you take it?",
+  "Du hältst an, um {0}. Das kostet dich {1}.":"You stop to {0}. That costs you {1}.",
+  // Kampf
+  "Feuergefecht!":"Gunfight!",
+  "{0} — Gesundheit {1}% — {2}: {3}":"{0} — Health {1}% — {2}: {3}",
+  "Weiter":"Continue",
+  "Mit allen Waffen gleichzeitig auf die Bullen schießen":"Shoot at the cops with all weapons at once",
+  "Feuern":"Fire",
+  "Fliehen — ca. 60% Chance, sonst schießt {0} zurück":"Flee — about 60% chance, otherwise {0} shoots back",
+  "Rennen":"Run",
+  "ein {0}":"a {0}",
+  "{0} und {1} greifen dich an!":"{0} and {1} attack you!",
+  " Beim Wegwerfen erwischt!":" Caught while dumping!",
+  "Du hast keine Waffe — du kannst nur rennen!":"You have no weapon — all you can do is run!",
+  "{0} trifft — eine deiner {1} ist gefallen! Sie hat dich gerettet.":"{0} hits — one of your {1} has fallen! She saved you.",
+  "{0} trifft dich tödlich. (-{1} HP)":"{0} hits you fatally. (-{1} HP)",
+  "{0} trifft dich! (-{1} HP)":"{0} hits you! (-{1} HP)",
+  "{0} schießt daneben.":"{0} misses.",
+  "Du bist entkommen!":"You escaped!",
+  "Du bist vor {0} entkommen.":"You escaped from {0}.",
+  "Du kommst nicht weg!":"You can't get away!",
+  "Du hast {0} erledigt! Auf dem Leichnam findest du {1}.":"You took out {0}! You find {1} on the body.",
+  "Du hast {0} erledigt und {1} genommen.":"You took out {0} and took {1}.",
+  "Ein Arzt bietet an, dich zusammenzunähen. Preis: {0} (Gesundheit: {1}%). Annehmen?":"A doctor offers to stitch you up. Price: {0} (health: {1}%). Accept?",
+  "Der Arzt näht dich zusammen. (Gesundheit 100%)":"The doctor stitches you up. (Health 100%)",
+  "Du hast nicht genug Bargeld für den Arzt.":"You don't have enough cash for the doctor.",
+  "Die Polizei":"The police","der Cop":"the cop",
+  "{0} hat dich erschossen.":"{0} shot you.",
+  "Der Paraquat tötet dich auf der Stelle.":"The paraquat kills you on the spot.",
+  "Du bist tot.":"You are dead.",
+  // Spielende / Highscores
+  "Du wurdest von der Polizei erschossen.":"You were shot by the police.",
+  "Das Paraquat war keine gute Idee.":"The paraquat was not a good idea.",
+  "Komplett pleite — Bargeld und Konto auf null, nichts mehr zu verkaufen.":"Completely broke — cash and account at zero, nothing left to sell.",
+  "Deine {0} Tage sind vorbei.":"Your {0} days are over.",
+  "Du hast aufgegeben.":"You gave up.",
+  "Negative Punkte — nichts für die Hall of Fame.":"Negative score — not for the Hall of Fame.",
+  "Du bist komplett pleite. Aus.":"You are completely broke. The end.",
+  "Negative Punkte haben in der Hall of Fame nichts verloren.":"Negative scores have no place in the Hall of Fame.",
+  "Platz {0} in der Hall of Fame mit {1}!":"Rank {0} in the Hall of Fame with {1}!",
+  "Reicht nicht für die Top 10 (nötig: mehr als {0}).":"Not enough for the top 10 (needed: more than {0}).",
+  "Dein bester Eintrag ({0}) bleibt stehen — der neue war schlechter.":"Your best entry ({0}) stays — the new one was worse.",
+  "Neuer persönlicher Rekord: Platz {0} mit {1}!":"New personal record: rank {0} with {1}!",
+  "Name":"Name","Datum":"Date","Punkte":"Score",
+  "— noch keine Einträge —":"— no entries yet —",
+  "Endstand":"Final score",
+  "Endstand in die Hall of Fame eintragen":"Enter the final score into the Hall of Fame",
+  "In Highscores eintragen":"Enter into highscores",
+  "Neues Spiel":"New game","Spiel neu beginnen":"Start a new game",
+  "💾 Highscores speichern":"💾 Save highscores",
+  "Neues Spiel mit dem Namen aus dem Eingabefeld starten":"Start a new game with the name from the input field",
+  // Neu-Dialog / Speichern / Laden / Dateien
+  "✚ Neues Spiel":"✚ New game",
+  "Das aktuelle Spiel (Tag {0}) wird dabei <b>überschrieben</b> — falls es dir wichtig ist, vorher 💾 Spiel speichern!":"The current game (day {0}) will be <b>overwritten</b> — if it matters to you, save it first (💾)!",
+  "Ja, neu anfangen":"Yes, start over",
+  "Kein laufendes Spiel zum Speichern.":"No running game to save.",
+  "Spielstand als Datei gespeichert.":"Game saved to file.",
+  "Keine gültige Spielstand-Datei.":"Not a valid save file.",
+  "Spielstand geladen.":"Save file loaded.",
+  "Speichern der Datei fehlgeschlagen.":"Saving the file failed.",
+  "Datei konnte nicht gelesen werden.":"The file could not be read.",
+  "Highscores geladen ({0} Einträge, Liste jetzt {1}).":"Highscores loaded ({0} entries, list now {1}).",
+  "Config als Datei gespeichert.":"Config saved to file.",
+  "Keine gültige Config-Datei.":"Not a valid config file.",
+  "Config geladen — prüfe die Werte und klicke „Übernehmen“.":"Config loaded — check the values and click “Apply”.",
+  "Highscore-Liste als Datei sichern":"Save the highscore list to a file",
+  "Highscores aus Datei laden und zusammenführen":"Load highscores from a file and merge them",
+  "Highscores als Datei gespeichert.":"Highscores saved to file.",
+  "Keine gültige Highscore-Datei.":"Not a valid highscore file.",
+  "Alle Einstellungen als Datei sichern":"Save all settings to a file",
+  "Einstellungen aus Datei laden (erst nach Übernehmen aktiv)":"Load settings from a file (applied after clicking Apply)",
+  "Alle Einstellungen auf Werkseinstellungen zurücksetzen (mit Bestätigung)":"Reset all settings to factory defaults (with confirmation)",
+  "Einstellungen übernommen.":"Settings applied.",
+  // Reset-Dialog
+  "Alle Einstellungen (Orte, Waren, Waffen, Polizisten, Begriffe, Zahlenwerte) werden auf die <b>Werkseinstellungen</b> zurückgesetzt — auch die im Browser gespeicherte Version. Deine Highscores bleiben erhalten. Ungespeicherte Änderungen in diesem Dialog gehen verloren.":"All settings (locations, drugs, guns, cops, terms, numbers) will be reset to <b>factory defaults</b> — including the version stored in the browser. Your highscores are kept. Unsaved changes in this dialog are lost.",
+  "Wirklich zurücksetzen?":"Really reset?",
+  "Ja, zurücksetzen":"Yes, reset","Nein, abbrechen":"No, cancel",
+  // Einstellungen: Felder & Blöcke
+  "⚙ Einstellungen <span style=\"letter-spacing:normal;color:var(--dim);font-size:12px\">· Version {0}</span>":"⚙ Settings <span style=\"letter-spacing:normal;color:var(--dim);font-size:12px\">· Version {0}</span>",
+  "Dateien (außerhalb des Browsers)":"Files (outside the browser)",
+  "Allgemein":"General","Orte":"Locations","Waren":"Drugs","Begriffe":"Terms",
+  "Sprache / Language":"Sprache / Language",
+  "Währungssymbol":"Currency symbol",
+  "Startgeld":"Starting cash","Startschulden":"Starting debt",
+  "Schuldenzins %":"Debt interest %","Bankzins %":"Bank interest %",
+  "Mantelplatz":"Coat space","Platz pro Hure":"Space per hooker",
+  "Billig-Teiler":"Cheap divider","Teuer-Faktor":"Expensive multiplier",
+  "Spielerrüstung %":"Player armor %","Huren-Rüstung %":"Hooker armor %",
+  "Hure Min-Preis":"Hooker min price","Hure Max-Preis":"Hooker max price",
+  "Hure Min-Verdienst/Tag":"Hooker min income/day","Hure Max-Verdienst/Tag":"Hooker max income/day",
+  "Huren-Max/Monat (30 Tage)":"Hooker cap/month (30 days)",
+  "Polizei %":"Police %","Min Warenzahl":"Min drug count","Max Warenzahl":"Max drug count",
+  "Min-Preis":"Min price","Max-Preis":"Max price",
+  "Billig-Nachricht":"Cheap message","kann billig":"can be cheap","kann teuer":"can be expensive",
+  "gefragt (Preis meist hoch, steigt mit Polizei)":"in demand (price usually high, rises with police)",
+  "Rüstung %":"Armor %","Rüstung der Polizisten %":"Cops' armor %",
+  "Min Polizisten":"Min cops","Max Polizisten":"Max cops",
+  "Angriffsmalus":"Attack penalty","Verteidigungsmalus":"Defense penalty",
+  "Hure (Einzahl)":"Hooker (singular)","Huren (Mehrzahl)":"Hookers (plural)",
+  "Polizist (Einzahl)":"Cop (singular)","Polizisten (Mehrzahl)":"Cops (plural)",
+  "Polizisten (Akkusativ)":"Cops (object form)",
+  "Polizisten":"Cops",
+  "+ Ort":"+ Location","+ Ware":"+ Drug","+ Waffe":"+ Gun","+ Polizist":"+ Cop",
+  "Ort entfernen":"Remove location","Ware entfernen":"Remove drug","Waffe entfernen":"Remove gun","Polizist entfernen":"Remove cop",
+  "Änderungen speichern und sofort anwenden":"Save changes and apply them at once",
+  "Übernehmen":"Apply",
+  "Änderungen verwerfen":"Discard changes",
+  "Alle Funktionen im Spiel und in den Einstellungen erklärt":"All game and settings features explained",
+  "❓ Hilfe":"❓ Help",
+  "Einstellungen Laden":"Load settings",
+  "Einstellungen und Highscores aus externer Datei laden":"Load settings and highscores from an external file",
+  "Neue Datei":"New file",
+  "Neue externe Datendatei anlegen (empfohlen: im Spielordner)":"Create a new external data file (recommended: in the game folder)",
+  "✕ Trennen":"✕ Disconnect",
+  "Verbindung zur externen Datei lösen — nichts wird gelöscht":"Disconnect from the external file — nothing is deleted",
+  "Extern Speichern":"Save externally",
+  "Aktuelle Config, Highscores und laufendes Spiel sofort in die externe Datei schreiben":"Write the current config, highscores and running game to the external file right now",
+  "Laufendes Spiel als Datei sichern":"Save the running game to a file",
+  "Spielstand aus Datei laden und weiterspielen":"Load a save file and continue",
+  "Externe Datei konnte nicht gelesen werden.":"Could not read the external file.",
+  "Externe Datei konnte nicht geschrieben werden.":"Could not write the external file.",
+  "Datei-Sync wird von diesem Browser nicht unterstützt (Export/Import nutzen).":"File sync is not supported by this browser (use export/import).",
+  "Extern verbunden: {0}":"Externally connected: {0}",
+  "Nicht verbunden (nur Browser-Speicher).":"Not connected (browser storage only).",
+  "⚠ Speichern nicht möglich — Fortschritt geht bei Neuladen verloren! ⚙ → Dateien → externe Datei verbinden.":"⚠ Saving not possible — progress will be lost on reload! ⚙ → Files → connect an external file.",
+  "Spiel automatisch wiederhergestellt — weiter geht's!":"Game restored automatically — let's continue!",
+  "Spiel fortgesetzt.":"Game resumed.",
+  "Willkommen, {0}. {1} Tage auf der Straße. Viel Glück.":"Welcome, {0}. {1} days on the street. Good luck.",
+  // Startbildschirm-Regeln (statischer Block, via applyStaticTexts)
+  "Inventar":"Inventory","Meldungen":"Messages","Aktionen":"Actions","Sortieren":"Sort",
+  "Preis aufsteigend":"Price ascending","Preis absteigend":"Price descending",
+  "Anonym":"Anonymous",
+  // Hilfe
+  "❓ Hilfe — alle Funktionen erklärt":"❓ Help — every feature explained",
+  "⟲ Zurück zu den Einstellungen":"⟲ Back to the settings",
+  "Diese Hilfe beschreibt jeden Button und jedes Feld — im Spiel und hier in den Einstellungen. Zahlen in Klammern sind die Werkseinstellungen.":"This help explains every button and every field — in the game and here in the settings. Numbers in brackets are the factory defaults.",
+  "Spielziel &amp; Grundregeln":"Goal &amp; basic rules",
+  "Kaufe Waren billig, reise und verkaufe sie teuer. Nach <b>Tage</b> (62) ist Schluss — oder früher: wenn du erschossen wirst, an Paraquat stirbst oder komplett pleite bist. Am Ende zählt <b>Bargeld + Konto − Schulden</b> als Punktzahl für die Hall of Fame (negative Punkte zählen nicht). Dein Mantel fasst <b>Mantelplatz</b> (100) Einheiten für Waren <i>und</i> Waffen; jede Hure bringt <b>Platz pro Hure</b> (10) zusätzlich.":"Buy drugs cheap, travel and sell them expensive. After <b>Days</b> (62) it is over — or earlier: if you get shot, die of paraquat or go completely broke. In the end <b>cash + account − debt</b> counts as your score for the Hall of Fame (negative scores don't count). Your coat holds <b>Coat space</b> (100) units for drugs <i>and</i> guns; each hooker adds <b>Space per hooker</b> (10).",
+  "Startbildschirm":"Start screen",
+  "<b>Spiel starten</b> — neues Spiel mit dem Namen aus dem Eingabefeld (ohne Namen: „Anonym\").":"<b>Start game</b> — a new game with the name from the input field (without a name: “Anonymous”).",
+  "<b>📂 Spielstand laden</b> — gespeicherte Spielstand-Datei öffnen und weiterspielen.":"<b>📂 Load save</b> — open a saved game file and continue playing.",
+  "<b>⚙ Einstellungen</b> — öffnet diesen Konfigurations-Editor.":"<b>⚙ Settings</b> — opens this configuration editor.",
+  "<b>Einstellungen Laden / Neue Datei</b> — externe Datendatei verbinden (siehe „Externe Datei\").":"<b>Load settings / New file</b> — connect an external data file (see “External file”).",
+  "<b>Spiel fortsetzen</b> — erscheint nur bei laufendem Spiel: macht genau dort weiter, wo du aufgehört hast. Das Spiel wird nach jeder Aktion automatisch gesichert.":"<b>Resume game</b> — only shown while a game is running: continues exactly where you left off. The game is saved automatically after every action.",
+  "<b>Farbschema</b> — vier Themes (Darkskin, BlueMoon, Creamy, Retro); die Auswahl wird gespeichert.":"<b>Theme</b> — four themes (Darkskin, BlueMoon, Creamy, Retro); the choice is saved.",
+  "<b>Hall of Fame</b> — Top 10 mit Datum. Neue Einträge gibt es nur am Spielende.":"<b>Hall of Fame</b> — top 10 with dates. New entries only at the end of a game.",
+  "Oberfläche im Spiel":"Interface in the game",
+  "<b>Kopfleiste</b> — Tag X/Y, Datum, aktueller Ort, Zahl der Huren, freier Platz, ⚙ Einstellungen, Farbschema, <b>💾 Spiel speichern</b> (Spielstand-Datei herunterladen), <b>📂 Spiel laden</b> (Spielstand aus Datei laden — ersetzt das laufende Spiel sofort) und <b>✚ Neu</b> (neues Spiel — überschreibt das aktuelle nach Bestätigung!).":"<b>Top bar</b> — day X/Y, date, current location, number of hookers, free space, ⚙ settings, theme, <b>💾 Save game</b> (download a save file), <b>📂 Load game</b> (load a save file — replaces the running game at once) and <b>✚ New</b> (new game — overwrites the current one after confirmation!).",
+  "<b>Status-Panel</b> — Bargeld, Bankkonto, Schulden (rot), Gesundheit als Balken (unter 40 % rot) und deine Waffen.":"<b>Status panel</b> — cash, bank account, debt (red), health as a bar (below 40 % red) and your guns.",
+  "<b>Inventar</b> — mitgeführte Waren mit Menge und ø bezahltem Preis. <b>Weg</b> wirft Ware weg (kein Geld, Bullen-Risiko).":"<b>Inventory</b> — carried drugs with quantity and average price paid. <b>Drop</b> throws drugs away (no money, risk of cops).",
+  "<b>Markt</b> — heutige Preise am Ort. Hellcyan = Schnäppchen (sehr niedriger Preis), rot = Preisexplosion. <b>Crack</b> ist heiß begehrt und kostet meist ein Vermögen — je mehr Polizei am Ort, desto teurer; nur selten bricht der Preis ein. Klick auf die Spaltenköpfe <b>Ware/Preis</b> sortiert (1. Klick aufsteigend, 2. Klick absteigend); die <b>Sortierung</b>-Auswahl gilt nur für die aktuelle Sitzung.":"<b>Market</b> — today's prices at the location. Bright cyan = bargain (very low price), red = price explosion. <b>Crack</b> is in hot demand and usually costs a fortune — the more police at the location, the higher the price; only rarely does the price crash. Click the <b>Drug/Price</b> column headers to sort (1st click ascending, 2nd descending); the <b>Sort</b> dropdown only applies to the current session.",
+  "<b>Log</b> — Ereignisverlauf (grün = gut, rot = schlecht).":"<b>Log</b> — event history (green = good, red = bad).",
+  "<b>Aktionsleiste</b> — Reisen, Kredithai, Bank, Waffenladen, Kneipe. Auf dem Handy ist sie fest am unteren Bildschirmrand, der Inhalt läuft darunter weg.":"<b>Action bar</b> — travel, loan shark, bank, gun shop, pub. On mobile it is fixed to the bottom edge of the screen and the content scrolls underneath.",
+  "Kaufen, Verkaufen, Wegwerfen":"Buying, selling, dumping",
+  "<b>Kaufen</b>: Menge frei wählbar (+1 / +10 / Max), begrenzt durch Bargeld und freien Platz — der komplette Platz lässt sich auf einmal aufkaufen. Eingabe: ganze Zahlen, Tausenderpunkte erlaubt (1.000). <b>Verkaufen</b> nur am aktuellen Ort zum dortigen Tagespreis (+1 / +10 / Alles). <b>ø bezahlt</b> ist dein Durchschnittseinkauf — Gewinn/Verlust steht im Log. <b>Weg</b> (Inventar) bringt kein Geld und löst mit der Polizei-%-Chance des Ortes ein Feuergefecht aus.":"<b>Buy</b>: choose any amount (+1 / +10 / Max), limited by cash and free space — you can buy up your entire space at once. Input: whole numbers, thousands separators allowed (1,000). <b>Sell</b> only at the current location at today's price (+1 / +10 / All). <b>avg paid</b> is your average purchase price — profit/loss shows in the log. <b>Drop</b> (inventory) makes no money and triggers a gunfight with the location's police-% chance.",
+  "Reisen &amp; Ereignisse":"Travel &amp; events",
+  "Jede Reise kostet <b>einen Tag</b>. Reist du vom letzten Tag weg, endet das Spiel („Zeit um\").":"Each trip costs <b>one day</b>. Traveling away on the last day ends the game (“Time's up”).",
+  "Bei jeder Reise laufen die Zinsen: Schulden + Schuldenzins %, Konto + Bankzins %.":"Every trip accrues interest: debt + debt interest %, account + bank interest %.",
+  "Huren verdienen bei jeder Reise Geld (siehe Allgemein → Huren-Felder), begrenzt pro 30-Tage-Block.":"Hookers earn money on every trip (see General → hooker fields), capped per 30-day block.",
+  "Unterwegs kann dich ein Ereignis treffen — die Chance steigt mit deinem Vermögen: <b>Überfall</b> (80–95 % deines Bargelds — Konto bleibt sicher), <b>Kumpel</b> leiht/schenkt Waren, <b>Funde</b> auf der Straße, „Mamas Brownies\“ fressen Weed/Hasch, ein <b>Paraquat-Deal</b> (tödlich, wenn du „Ja\“ sagst!) oder du bleibst für Kleinkram stehen.":"On the way an event can hit you — the chance rises with your wealth: a <b>mugging</b> (80–95 % of your cash — the account stays safe), a <b>buddy</b> lends/gives you drugs, <b>finds</b> on the street, “mama's brownies” eat your weed/hash, a <b>paraquat deal</b> (fatal if you say “yes”!) or you stop for small expenses.",
+  "Straßenangebot: eine Hure oder Waffe zum Zehntel des normalen Preises.":"Street offer: a hooker or a gun at one tenth of the normal price.",
+  "Bei 15 % der Reisen sagt eine Dame in der Ubahn etwas Sinnfreies.":"On 15 % of trips a lady on the subway says something nonsensical.",
+  "Polizeikampf":"Police fight",
+  "Ausgelöst durch Reisen oder Wegwerfen (Polizei-% des Ortes). Ohne Waffe bleibt nur <b>Rennen</b>.":"Triggered by traveling or dumping (the location's police-%). Without a gun, <b>Run</b> is your only option.",
+  "<b>Feuern</b> — alle Waffen gleichzeitig. Erst fallen die Begleiter, dann der Chef-Bulle.":"<b>Fire</b> — all weapons at once. First the deputies fall, then the boss cop.",
+  "<b>Rennen</b> — ca. 60 % Erfolg; misslingt es, schießt der Bulle zurück.":"<b>Run</b> — about 60 % success; if it fails, the cop shoots back.",
+  "Trifft dich der Bulle tödlich, opfert sich eine Hure (Gesundheit wieder 100 %) — solange du eine dabei hast. Ohne Hure: Spielende.":"If a cop hits you fatally, a hooker sacrifices herself (health back to 100 %) — as long as you have one. Without a hooker: game over.",
+  "<b>Chef erledigt</b> — Geld vom Leichnam; danach greift die nächstschwerere Stufe aus der Polizisten-Liste an, der letzte kehrt immer wieder.":"<b>Boss taken out</b> — money from the body; afterwards the next harder level from the cops list attacks, the last one keeps coming back.",
+  "Danach bietet sich oft ein <b>Arzt</b> an, dich zusammenzunähen (Preis steigt mit fehlender Gesundheit).":"Afterwards there is often a <b>doctor</b> offering to stitch you up (the price rises with missing health).",
+  "Einstellungen — Allgemein":"Settings — General",
+  "<b>Währungssymbol</b> — Zeichen vor allen Beträgen (€).":"<b>Currency symbol</b> — sign in front of all amounts (€).",
+  "<b>Tage</b> (62) — Spiellänge.":"<b>Days</b> (62) — game length.",
+  "<b>Startgeld</b> (5.000) / <b>Startschulden</b> (5.000) — Werte eines neuen Spiels.":"<b>Starting cash</b> (5,000) / <b>Starting debt</b> (5,000) — values of a new game.",
+  "<b>Schuldenzins %</b> (10) — Zuwachs der Schulden pro Tag.":"<b>Debt interest %</b> (10) — debt growth per day.",
+  "<b>Bankzins %</b> (5) — Zuwachs des Kontos pro Tag.":"<b>Bank interest %</b> (5) — account growth per day.",
+  "<b>Mantelplatz</b> (100) — Basis-Platz für Waren + Waffen.":"<b>Coat space</b> (100) — base space for drugs + guns.",
+  "<b>Platz pro Hure</b> (10) — zusätzlicher Platz je Hure.":"<b>Space per hooker</b> (10) — extra space per hooker.",
+  "<b>Billig-Teiler</b> (4) — Schnäppchen-Preis = Zufallspreis ÷ Teiler.":"<b>Cheap divider</b> (4) — bargain price = random price ÷ divider.",
+  "<b>Teuer-Faktor</b> (4) — Preisexplosion = Zufallspreis × Faktor.":"<b>Expensive multiplier</b> (4) — price explosion = random price × factor.",
+  "<b>Spielerrüstung %</b> (100) — Schadenshöhe bei Treffern ohne Huren: je höher, desto weniger Schaden.":"<b>Player armor %</b> (100) — damage when hit without hookers: the higher, the less damage.",
+  "<b>Huren-Rüstung %</b> (50) — dito, solange Huren dabei sind (niedriger = mehr Schaden!). Huren senken den Schaden nicht — sie fangen nur den tödlichen Treffer ab.":"<b>Hooker armor %</b> (50) — same, while hookers are present (lower = more damage!). Hookers don't reduce damage — they only take the fatal hit.",
+  "<b>Hure Min-/Max-Preis</b> (2.000–50.000) — Preisspanne in der Kneipe; Arzt und Straßenangebote leiten sich daraus ab.":"<b>Hooker min/max price</b> (2,000–50,000) — price range in the pub; doctor and street offers derive from it.",
+  "<b>Hure Min-/Max-Verdienst/Tag</b> (20–2.000) — tägliches Einkommen je Hure.":"<b>Hooker min/max income/day</b> (20–2,000) — daily income per hooker.",
+  "<b>Huren-Max/Monat (30 Tage)</b> (10.000) — Einkommensdeckel je 30-Tage-Block; 0 = unbegrenzt.":"<b>Hooker cap/month (30 days)</b> (10,000) — income cap per 30-day block; 0 = unlimited.",
+  "Einstellungen — Orte, Waren, Waffen, Polizisten":"Settings — locations, drugs, guns, cops",
+  "<b>+ Ort</b>/<b>+ Ware</b>/… hängt einen neuen Eintrag an, <b>✕</b> entfernt ihn. Bestände wandern beim Übernehmen per Name mit — entfernst du eine Ware/Waffe, ist ihr Bestand weg.":"<b>+ Location</b>/<b>+ Drug</b>/… appends a new entry, <b>✕</b> removes it. Inventory carries over by name when you apply — if you remove a drug/gun, its stock is gone.",
+  "<b>Orte</b> — <b>Name</b>; <b>Polizei %</b> (Gefahr von Bullen beim Reisen/Wegwerfen, je höher, desto gefährlicher); <b>Min-/Max Warenzahl</b> — wie viele verschiedene Waren hier angeboten werden (Zufall in der Spanne, höchstens so viele wie konfiguriert).":"<b>Locations</b> — <b>name</b>; <b>police %</b> (danger of cops when traveling/dumping, the higher the more dangerous); <b>min/max drug count</b> — how many different drugs are offered here (random in the range, at most as many as configured).",
+  "<b>Waren</b> — <b>Name</b>; <b>Min-/Max-Preis</b> (tägliche Zufallsspanne); <b>Billig-Nachricht</b> (Log-Text beim Schnäppchen); <b>kann billig</b>/<b>kann teuer</b> (Teilnahme an Sonderereignissen; beide an = 50/50); <b>gefragt</b> (Häkchen: Preis liegt meist nahe am Max-Preis — je mehr Polizei am Ort, desto höher; selten bricht der Markt ein. Standard bei Crack).":"<b>Drugs</b> — <b>name</b>; <b>min/max price</b> (daily random range); <b>cheap message</b> (log text for a bargain); <b>can be cheap</b>/<b>can be expensive</b> (participation in special events; both on = 50/50); <b>in demand</b> (checkbox: price usually sits near the max price — the more police at the location, the higher; the market only rarely crashes. Default for Crack).",
+  "<b>Waffen</b> — <b>Name</b>, <b>Preis</b> (auch Rückkaufspreis), <b>Platz</b> (Mantel), <b>Schaden</b> (Feuerkraft im Kampf).":"<b>Guns</b> — <b>name</b>, <b>price</b> (also the buy-back price), <b>space</b> (coat), <b>damage</b> (firepower in a fight).",
+  "<b>Polizisten</b> — die Eskalationsstufen: <b>Name</b>; <b>Rüstung %</b> (Schutz des Chefs, wenn nur noch er übrig ist) und <b>Rüstung der Polizisten %</b> (Schutz der Truppe, solange Begleiter da sind — höher = widerstandsfähiger); <b>Min-/Max Polizisten</b> (Begleiterzahl); <b>Angriffsmalus</b> (schwächt das Feuer der Bullen) und <b>Verteidigungsmalus</b> (schwächt ihre Deckung — höher = du triffst leichter).":"<b>Cops</b> — the escalation levels: <b>name</b>; <b>armor %</b> (protection of the boss when he is the only one left) and <b>cops' armor %</b> (protection of the squad while deputies are present — higher = tougher); <b>min/max cops</b> (number of deputies); <b>attack penalty</b> (weakens the cops' fire) and <b>defense penalty</b> (weakens their cover — higher = you hit more easily).",
+  "Einstellungen — Begriffe":"Settings — terms",
+  "Alle Texte im Spiel nutzen diese Bezeichner: Hure/Huren, Polizist/Polizisten, <b>Akkusativ</b>-Form (für „…erschossen!\“), Kredithai, Bank, Waffenladen, Kneipe. Nach <b>Übernehmen</b> wirken sie sofort überall.":"All texts in the game use these identifiers: hooker/hookers, cop/cops, <b>object form</b> (for “…shot!”), loan shark, bank, gun shop, pub. After <b>Apply</b> they take effect everywhere at once.",
+  "<b>Sprache / Language</b> — Sprache der gesamten Oberfläche (Standard: Deutsch). Der Wechsel wirkt nach <b>Übernehmen</b> sofort.":"<b>Sprache / Language</b> — language of the entire interface (default: German). After <b>Apply</b> a change takes effect at once.",
+  "Angebot":"Offer","Ja":"Yes","Nein":"No",
+  "Kredithai":"Loan shark",
+  "<b>Leihen</b> — Bargeld rein, Schulden rein. <b>Zurückzahlen</b> — Betrag eingeben. <b>Alles bezahlen</b> — zahlt so viel wie möglich; fragt immer nach, weil es dich auf 0 € bringen und damit das Spiel beenden kann. Zinsen: <b>Schuldenzins %</b> pro Tag. Beträge abkürzen erlaubt: 2500, 2.5k oder 1m.":"<b>Borrow</b> — cash in, debt in. <b>Repay</b> — enter an amount. <b>Pay all</b> — pays as much as possible; it always asks, because it can leave you at €0 and thus end the game. Interest: <b>Debt interest %</b> per day. Abbreviating amounts is allowed: 2500, 2.5k or 1m.",
+  "<b>Einzahlen</b>/<b>Auszahlen</b>. Das Konto wächst um <b>Bankzins %</b> pro Tag und ist vor Überfällen sicher — geraubt werden kann nur Bargeld.":"<b>Deposit</b>/<b>Withdraw</b>. The account grows by <b>Bank interest %</b> per day and is safe from muggings — only cash can be stolen.",
+  "Waffen kaufen (Kaufpreis plus nötiger Platz) und <b>zum vollen Kaufpreis</b> wieder verkaufen. Mehr Waffen = mehr Feuerpower im Kampf.":"Buy guns (purchase price plus required space) and sell them back <b>at the full purchase price</b>. More guns = more firepower in a fight.",
+  "<b>Anheuern</b> — Preis zufällig zwischen <b>Hure Min-/Max-Preis</b>. Jede Hure gibt +<b>Platz pro Hure</b> Platz, verdient bei jeder Reise Geld (Min-/Max-Verdienst, Monats-Limit) und fängt einmal einen tödlichen Treffer für dich ab.":"<b>Hire</b> — price random between <b>Hooker min/max price</b>. Each hooker adds +<b>Space per hooker</b> space, earns money on every trip (min/max income, monthly cap) and takes one fatal hit for you.",
+  "Spielende &amp; Highscores":"Game over &amp; highscores",
+  "Enden: <b>Zeit um</b>, <b>erschossen</b>, <b>Paraquat</b> oder <b>komplett pleite</b> (Bargeld, Konto, Waren, Waffen und Huren alles bei null).":"Endings: <b>time's up</b>, <b>shot</b>, <b>paraquat</b> or <b>completely broke</b> (cash, account, drugs, guns and hookers all at zero).",
+  "Punkte = Bargeld + Konto − Schulden. Negative Punkte landen nicht in der Hall of Fame.":"Score = cash + account − debt. Negative scores don't make it into the Hall of Fame.",
+  "<b>In Highscores eintragen</b> — max. 10 Plätze. Ist die Liste voll, kommst du nur über deinen eigenen Rekord rein (dein schlechtester eigener Eintrag wird ersetzt) bzw. musst den letzten Platz überbieten.":"<b>Enter into highscores</b> — max. 10 places. If the list is full, you only get in via your own record (your worst own entry gets replaced) or by beating the last place.",
+  "<b>Highscores speichern/laden</b> — Liste als Datei sichern bzw. aus einer Datei zusammenführen.":"<b>Save/load highscores</b> — save the list to a file or merge from a file.",
+  "Einstellungen — Dateien":"Settings — files",
+  "<b>💾/📂 Spiel speichern/laden</b> — laufendes Spiel als .json-Datei sichern bzw. laden (enthält auch die Config).":"<b>💾/📂 Save/load game</b> — save or load the running game as a .json file (also contains the config).",
+  "<b>💾/📂 Highscores speichern/laden</b> — Liste sichern bzw. aus Datei zusammenführen.":"<b>💾/📂 Save/load highscores</b> — save the list or merge from a file.",
+  "<b>💾/📂 Config speichern/laden</b> — nur die Einstellungen; eine geladene Config wird erst mit <b>Übernehmen</b> aktiv.":"<b>💾/📂 Save/load config</b> — only the settings; a loaded config only becomes active with <b>Apply</b>.",
+  "<b>Reset</b> — alles auf Werkseinstellungen zurücksetzen (mit Bestätigung). Highscores bleiben erhalten.":"<b>Reset</b> — reset everything to factory defaults (with confirmation). Highscores are kept.",
+  "Ohne externe Datei liegt alles im Browser-Speicher; kann der Browser nicht speichern, erscheint eine dauerhafte Warnleiste.":"Without an external file everything lives in browser storage; if the browser cannot save, a permanent warning bar appears.",
+  "Einstellungen — Externe Datei":"Settings — external file",
+  "Verbinde eine .json-Datei: <b>Neue Datei</b> legt sie an (empfohlen im Spielordner), <b>Einstellungen Laden</b> öffnet eine bestehende. Danach liest das Spiel Config, Highscores und Spielstand daraus und schreibt bei <b>jeder Änderung automatisch</b> zurück. <b>Extern Speichern</b> erzwingt sofortiges Schreiben — er wirkt nur bei bestehender Verbindung (Statuszeile: „Extern verbunden: …\“), sonst passiert nichts. <b>✕ Trennen</b> löst die Verbindung, ohne etwas zu löschen. Vorteil: Daten überleben Browser-Wechsel und Neuladen. Funktioniert in Chrome/Edge; andere Browser nutzen stattdessen Export/Import.":"Connect a .json file: <b>New file</b> creates one (recommended in the game folder), <b>Load settings</b> opens an existing one. Afterwards the game reads config, highscores and the running game from it and writes back <b>automatically on every change</b>. <b>Save externally</b> forces an immediate write — it only works with an existing connection (status line: \“Externally connected: …\”), otherwise nothing happens. <b>✕ Disconnect</b> releases the connection without deleting anything. Advantage: data survive browser switches and reloads. Works in Chrome/Edge; other browsers use export/import instead.",
+  "Einstellungen — Übernehmen &amp; Abbrechen":"Settings — Apply &amp; cancel",
+  "<b>Übernehmen</b> macht alle Änderungen sofort aktiv, sichert sie im Browser (und in der externen Datei) und zieht laufende Bestände per Name in die neue Config um. <b>Abbrechen</b> (oder Esc / Klick außerhalb) verwirft die Änderungen dieses Dialogs. Die ✕-Buttons und +X-Buttons wirken direkt im Dialog — gespeichert wird erst mit Übernehmen.":"<b>Apply</b> makes all changes active at once, saves them in the browser (and in the external file) and migrates running inventory into the new config by name. <b>Cancel</b> (or Esc / clicking outside) discards this dialog's changes. The ✕ and +X buttons act directly in the dialog — nothing is saved until you click Apply.",
+};
+/* Deutsche → englische Standard-Content-Texte aus BAKED_CFG (Namen, Meldungen,
+   Sager). Eigene, geänderte Config-Texte bleiben unübersetzt. */
+const CONTENT_EN={
+  // Orte
+  "Hauptbahnhof":"Central Station","Stadtpark":"City Park","Ubahn":"Subway",
+  "Dippemess":"Dippemess","Zeil":"Zeil",
+  // Waren
+  "Kokaine":"Cocaine","Hasch":"Hash","Extacy":"Ecstasy","Pilze":"Shrooms",
+  "Medikamente":"Medicine",
+  // Waffen
+  "Pistole":"Pistol",
+  // Polizisten
+  "Kok Schmidt":"Coke Schmidt","Kok Meyer":"Coke Meyer","V-Mann":"Narc",
+  // Begriffe
+  "Hure":"hooker","Huren":"hookers","Polizist":"cop","Polizisten":"cops",
+  "der Kredithai":"the loan shark","die Bank":"the bank",
+  "Joes Waffenladen":"Joe's gun shop","die Batschkapp":"the Batschkapp",
+  // Billig-Meldungen
+  "LSD aus NL ist eingetroffen.":"LSD from the Netherlands has arrived.",
+  "Ein Koks Bomber ist Abgestürzt!":"A coke plane has crashed!",
+  "Der Ananas Express ist da!":"The pineapple express is here!",
+  "Frischer wind aus Afghanistan.":"Fresh winds from Afghanistan.",
+  "Love Parade startet!":"Love Parade is starting!",
+  "Die Pilzsammler waren da!":"The mushroom pickers were here!",
+  "Schnelles ist im Umlauf!":"Fast stuff is going around!",
+  "Weed für Alle!!!":"Weed for everyone!!!",
+  "Letzte Nacht ne Apotheke gemacht!":"Hit a pharmacy last night!",
+  // Teuer-Meldungen (%Tde bleibt Platzhalter)
+  "Die Bullen haben eine große %Tde-Beschlagnahme gemacht! Die Preise sind unverschämt!":"The cops made a huge %Tde bust! The prices are outrageous!",
+  "Süchtige kaufen %Tde zu absurden Preisen!":"Addicts are buying %Tde at absurd prices!",
+  // U-Bahn-Sager
+  "Hey, du siehst aus wie ein Drogendealer!":"Hey, you look like a drug dealer!",
+  "Willst du eine Uhr kaufen? Ganz billig.":"Want to buy a watch? Really cheap.",
+  "Die Bullen machen heute wieder Razzien, pass auf dich auf.":"The cops are raiding again today, watch yourself.",
+  "Ich hab gehört, in Berlin sind die Preise im Keller.":"I heard prices in Berlin have hit rock bottom.",
+  "Weißt du, wo ich billig Weed bekomme?":"Do you know where I can get cheap weed?",
+  "Lauf nicht so schnell, dann lebst du länger.":"Don't walk so fast, you'll live longer.",
+  "Hast du mal 'nen Euro für die Bahn?":"Got a euro for the train?",
+  "Pass auf die Schmidts und Müllers auf, die sind überall.":"Watch out for the Schmidts and Müllers, they're everywhere.",
+  "Auf der Dippemess ist was los diese Woche, Alter.":"Something's going on at the Dippemess this week, man.",
+  "Geschäft läuft gut dieses Jahr, was?":"Business is good this year, huh?",
+  // angehalten um …
+  "ein Bier trinken":"drink a beer","einen Joint rauchen":"smoke a joint",
+  "eine Zigarre rauchen":"smoke a cigar","eine Zigarette rauchen":"smoke a cigarette",
+};
+/* UI-Übersetzung: Deutsch ist Quellsprache; bei lang="en" wird der Eintrag aus
+   EN genutzt (fehlende Einträge fallen auf Deutsch zurück). {0},{1},… werden
+   mit den weiteren Argumenten gefüllt. */
+function E(s,...a){
+  if(CFG.lang==="en"){ const t=EN[s]; if(t!==undefined) s=t; }
+  a.forEach((v,i)=>{ s=s.split("{"+i+"}").join(v); });
+  return s;
+}
+/* Config-Content (Namen, Meldungen, Sager) übersetzen — nur Standardtexte. */
+function tc(s){ if(CFG.lang!=="en"||typeof s!=="string") return s; const t=CONTENT_EN[s]; return t!==undefined?t:s; }
+function dn(i){ return tc(CFG.drugs[i].name); }
+function lnm(i){ return tc(CFG.locations[i].name); }
+function gnm(i){ return tc(CFG.guns[i].name); }
+function cnm(i){ return tc(CFG.cops[i].name); }
+function nm(k){ return tc(CFG.names[k]); }
+
+/* Aktive Konfiguration: im Spiel änderbar (⚙ Einstellungen), geänderte
+   Werte haben Vorrang und bleiben im Browser gespeichert. */
+const CFGKEY="dopewars.frankfurt.cfg";
+/* Fehlende Felder aus der Werkskonfiguration nachrüsten (ältere gespeicherte
+   Configs / Spielstände enthalten neue Optionen noch nicht) */
+function fillDefaults(target,defaults){
+  Object.keys(defaults).forEach(k=>{
+    if(!(k in target)) target[k]=JSON.parse(JSON.stringify(defaults[k]));
+    else if(defaults[k] && typeof defaults[k]==="object" && !Array.isArray(defaults[k])
+            && target[k] && typeof target[k]==="object" && !Array.isArray(target[k]))
+      fillDefaults(target[k],defaults[k]);
+  });
+}
+/* Doppel-kodierte Sonderzeichen (Fehlerfall) in gespeicherten Strings reparieren */
+const MOJI_MAP={"Ã¤":"ä","Ã¶":"ö","Ã¼":"ü","Ã„":"Ä","Ã–":"Ö","Ãœ":"Ü","ÃŸ":"ß",
+  "â‚¬":"€","â€ž":"„","â€œ":"“","â€ ":"”","â€“":"–","â€”":"—",
+  "Ã©":"é","Ã¨":"è","Ã¡":"á","Ã³":"ó","Ãš":"Ú","Ã§":"ç","Ã±":"ñ"};
+function fixMoji(s){
+  if(typeof s!=="string" || !/[ÃÂâ]/.test(s)) return s;
+  let t=s;
+  Object.keys(MOJI_MAP).sort((a,b)=>b.length-a.length)
+    .forEach(k=>{ t=t.split(k).join(MOJI_MAP[k]); });
+  return t;
+}
+function fixMojiDeep(o){
+  if(typeof o==="string") return fixMoji(o);
+  if(Array.isArray(o)) return o.map(fixMojiDeep);
+  if(o && typeof o==="object"){ const r={}; for(const k in o) r[k]=fixMojiDeep(o[k]); return r; }
+  return o;
+}
+/* Alte Standard-Namen/-Werte auf die neuen Defaults heben (nur wenn der
+   Wert noch dem alten Standard entspricht — eigene Änderungen bleiben) */
+function migrateCfg(c){
+  if(!c) return;
+  const f=fixMojiDeep(c);
+  Object.keys(f).forEach(k=>{ c[k]=f[k]; });
+  if(c.names){
+    if(c.names.deputy==="Beamter") c.names.deputy="Polizist";
+    if(c.names.deputies==="Beamte") c.names.deputies="Polizisten";
+    if(c.names.deputyAcc==="Beamten") c.names.deputyAcc="Polizisten";
+    if(c.names.gunShop==="Dans Waffenladen") c.names.gunShop="Joes Waffenladen";
+    if(c.names.pub==="die Kneipe") c.names.pub="die Batschkapp";
+  }
+  if(c.bitchMin===50000) c.bitchMin=2000;
+  if(c.bitchMax===150000) c.bitchMax=50000;
+  if(Array.isArray(c.guns) && c.guns[1] && c.guns[1].name==="Revolver" && c.guns[1].damage===15)
+    c.guns[1].damage=11;
+  if(Array.isArray(c.cops)){
+    if(c.cops[0] && c.cops[0].name==="Pok Schmidt") c.cops[0].name="Kok Schmidt";
+    if(c.cops[1] && c.cops[1].name==="Kok Müller") c.cops[1].name="Kok Meyer";
+    if(c.cops[2] && c.cops[2].name==="Informant") c.cops[2].name="V-Mann";
+  }
+  /* Neue Standard-Ware "Crack" nachrüsten — aber nur, solange die Warenliste
+     noch exakt der alten Werkseinstellung entspricht (eigene Listen bleiben
+     wie überall in der Migration unangetastet). */
+  if(Array.isArray(c.drugs)){
+    const alt=BAKED_CFG.drugs.filter(d=>d.name!=="Crack").map(d=>d.name);
+    const ist=c.drugs.map(d=>d.name);
+    if(ist.length===alt.length && alt.every((n,i)=>ist[i]===n)){
+      const crack=BAKED_CFG.drugs.find(d=>d.name==="Crack");
+      if(crack) c.drugs.push(JSON.parse(JSON.stringify(crack)));
+    }
+  }
+}
+let CFG=(function(){
+  try{
+    const c=JSON.parse(localStorage.getItem(CFGKEY)||"null");
+    if(c && Array.isArray(c.drugs) && c.drugs.length>0 &&
+       Array.isArray(c.locations) && c.locations.length>0){
+      fillDefaults(c,BAKED_CFG);
+      migrateCfg(c);
+      try{ localStorage.setItem(CFGKEY,JSON.stringify(c)); }catch(e){}
+      return c;
+    }
+  }catch(e){}
+  return JSON.parse(JSON.stringify(BAKED_CFG));
+})();
+
+/* Ware anhand des Namens suchen (Config ist frei editierbar) */
+function drugIdxByName(name){ const i=CFG.drugs.findIndex(d=>d.name===name); return i>=0?i:-1; }
+
+/* ================= Hilfsfunktionen ================= */
+function brandom(a,b){ return a + Math.floor(Math.random()*(b-a)); }   // [a,b) wie im Original
+function prandom(a,b){ return a + Math.random()*(b-a); }
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function fmt(n){ return (n<0?"-":"") + CFG.currency +
+  Math.abs(Math.round(n)).toLocaleString(CFG.lang==="en"?"en-US":"de-DE"); }
+function fmtDate(d){ const p=x=>(""+x).padStart(2,"0");
+  return CFG.lang==="en"
+    ? p(d.getMonth()+1)+"/"+p(d.getDate())+"/"+d.getFullYear()
+    : p(d.getDate())+"."+p(d.getMonth()+1)+"."+d.getFullYear(); }
+function el(id){ return document.getElementById(id); }
+function parseAmount(s){
+  s=(""+s).trim();
+  const m=s.match(/^(-?[\d.,]+)\s*([kKmM])?$/);
+  if(!m) return NaN;
+  let num=m[1], v;
+  if(m[2]){                                  // 2.5k / 2,5k / 1m (Dezimalpunkt wie im Original)
+    v=parseFloat(num.replace(",","."))*(
+      m[2].toLowerCase()==="k" ? 1000 : 1000000);
+  }else if(/^\d{1,3}(\.\d{3})+$/.test(num)){ // 1.234 = Tausenderpunkt
+    v=parseInt(num.replace(/\./g,""),10);
+  }else if(/^\d+\.\d+$/.test(num)){          // 2.5 ohne Suffix
+    v=Math.floor(parseFloat(num));
+  }else{
+    v=parseInt(num.replace(/[.,]/g,""),10);
+  }
+  return isNaN(v)?NaN:Math.floor(v);
+}
+
+/* ================= Marktsortierung ================= */
+let sortMode="name";            // name | namedown | priceup | pricedown (nur für die Sitzung)
+function setSort(v){
+  sortMode=v;
+  render();
+}
+/* Klick auf Spaltenkopf: 1. Klick aufsteigend, 2. Klick absteigend */
+function sortClick(kind){
+  if(kind==="name") setSort(sortMode==="name"?"namedown":"name");
+  else setSort(sortMode==="pricedown"?"priceup":"pricedown");
+}
+function sortHeader(label,kind,cls){
+  const active=kind==="name" ? (sortMode==="name"||sortMode==="namedown")
+                             : (sortMode==="priceup"||sortMode==="pricedown");
+  const arrow=active ? (kind==="name" ? (sortMode==="name"?" ▲":" ▼")
+                                      : (sortMode==="priceup"?" ▲":" ▼")) : "";
+  return `<th class="${cls||""} sortable${active?" active":""}" onclick="sortClick('${kind}')">${label}${arrow}</th>`;
+}
+
+/* ================= Spielzustand ================= */
+let S=null;          // Spieler-Stand
+let F=null;          // laufender Polizeikampf
+const LOG=[];
+const HIKEY="dopewars.frankfurt.hiscores";
+const THEMEKEY="dopewars.frankfurt.theme";
+
+/* ===== Themes — Farbtokens aus design.md § 3 =====
+   Einzige Farbquelle im Code: keine Hex-Werte außerhalb von THEMES. */
+const THEMES={
+  darkskin:{label:"Darkskin",                     // Anthrazit / helles Grün
+    bg:"#1B1B1D",panel:"#222226",elev:"#2A2A2F",elevHover:"#323238",input:"#26262B",
+    text:"#A8E6A1",dim:"#86C286",off:"#5C7A5C",
+    accent:"#7ED67E",accentStrong:"#55B855",danger:"#D96A6A",
+    border:"#34343A",sel:"rgba(126,214,126,0.18)",overlay:"rgba(15,15,16,0.72)",
+    scrollTrack:"#26262B",scrollHandle:"#55555C",gold:"#FFE98A",dealCheap:"#4DEEEA"},
+  bluemoon:{label:"BlueMoon",                     // Dunkelblau / helles Gelb
+    bg:"#0D1B2A",panel:"#12263A",elev:"#173049",elevHover:"#1E3B59",input:"#132C44",
+    text:"#FFEC9E",dim:"#D9C77E",off:"#8A8160",
+    accent:"#FFD75E",accentStrong:"#F2C230",danger:"#E08080",
+    border:"#1F3A57",sel:"rgba(255,215,94,0.16)",overlay:"rgba(6,14,24,0.72)",
+    scrollTrack:"#12263A",scrollHandle:"#2C5480",gold:"#FFEC9E",dealCheap:"#45E6FF"},
+  retro:{label:"Retro (Grün)",                    // bisheriger Terminal-Look
+    bg:"#060A06",panel:"#0B140B",elev:"#101D10",elevHover:"#162516",input:"#041004",
+    text:"#7CE27C",dim:"#598759",off:"#2F4F2F",
+    accent:"#7CE27C",accentStrong:"#55B855",danger:"#E86A6A",
+    border:"#1E3A1E",sel:"rgba(124,226,124,0.14)",overlay:"rgba(2,6,2,0.82)",
+    scrollTrack:"#0B140B",scrollHandle:"#2F4F2F",gold:"#FFE98A",dealCheap:"#4DEEEA"},
+  creamy:{label:"Creamy",                         // Sandfarben / schwarze Schrift
+    bg:"#D1C2A1",panel:"#D1C2A1",elev:"#E9DFC4",elevHover:"#F1E9D2",input:"#E3B04B",
+    text:"#262115",dim:"#655940",off:"#998966",
+    accent:"#8A6D1F",accentStrong:"#6B5A1E",danger:"#A03A2C",
+    border:"#B5A47C",sel:"rgba(138,109,31,0.18)",overlay:"rgba(60,50,30,0.55)",
+    scrollTrack:"#D1C2A1",scrollHandle:"#B5A47C",gold:"#8A6D1F",dealCheap:"#0E8C99"},
+};
+
+function applyTheme(name){
+  if(!THEMES[name]){
+    console.warn("Unbekanntes Theme \""+name+"\" — falle auf Darkskin zurück.");
+    name="darkskin";
+  }
+  const t=THEMES[name], r=document.documentElement.style;
+  r.setProperty("--bg",t.bg);             r.setProperty("--panel",t.panel);
+  r.setProperty("--elev",t.elev);         r.setProperty("--elev-hover",t.elevHover);
+  r.setProperty("--input",t.input);       r.setProperty("--text",t.text);
+  r.setProperty("--dim",t.dim);           r.setProperty("--off",t.off);
+  r.setProperty("--accent",t.accent);     r.setProperty("--accent-strong",t.accentStrong);
+  r.setProperty("--danger",t.danger);     r.setProperty("--border",t.border);
+  r.setProperty("--gold",t.gold);         r.setProperty("--deal-cheap",t.dealCheap);
+  r.setProperty("--sel",t.sel);           r.setProperty("--overlay",t.overlay);
+  r.setProperty("--scroll-track",t.scrollTrack);
+  r.setProperty("--scroll-handle",t.scrollHandle);
+  document.documentElement.dataset.theme=name;
+  try{ localStorage.setItem(THEMEKEY,name); }catch(e){}
+  document.querySelectorAll("select.themesel").forEach(s=>{ s.value=name; });
+}
+(function(){                                  // gespeichertes Theme beim Start anwenden
+  let t=null; try{ t=localStorage.getItem(THEMEKEY); }catch(e){}
+  applyTheme(t||"darkskin");
+})();
+
+function log(msg,cls){ LOG.push({t:msg,c:cls||""}); if(LOG.length>200)LOG.shift(); renderLog(); }
+
+/* Startdatum jeder neuen Partie (Original: 1.12.1984 — heute zeitgemäß 2026) */
+const GAME_START=new Date(2026,11,1);         // 01.12.2026
+
+function newGame(nameOverride){
+  const name=(nameOverride??el("pname").value).trim()||"Anonym";
+  S={ name, turn:1, day:new Date(GAME_START.getTime()), loc:0,
+      cash:CFG.startCash, bank:0, debt:CFG.startDebt,
+      health:100, bitches:0, copLevel:0, over:false,
+      drugs:CFG.drugs.map(()=>({n:0,paid:0})),
+      guns:CFG.guns.map(()=>0),
+      market:CFG.drugs.map(()=>({price:0,deal:0})) };
+  LOG.length=0;
+  el("startscreen").classList.add("hidden");
+  el("gamescreen").classList.remove("hidden");
+  log(E("Willkommen, {0}. {1} Tage auf der Straße. Viel Glück.",name,CFG.numTurns));
+  generateMarket();
+  announceSpecials();
+  render();
+}
+
+/* ================= Bestand / Platz ================= */
+function drugsTotal(){ return S.drugs.reduce((a,d)=>a+d.n,0); }
+function gunsSpace(){ return S.guns.reduce((a,g,i)=>a+g*CFG.guns[i].space,0); }
+function gunsTotal(){ return S.guns.reduce((a,g)=>a+g,0); }
+function totalSpace(){ return CFG.baseSpace + S.bitches*CFG.bitchSpace; }
+function freeSpace(){ return totalSpace() - drugsTotal() - gunsSpace(); }
+
+/* ================= Marktpreise (wie GenerateDrugsHere) ================= */
+function generateMarket(){
+  const deals=new Array(CFG.drugs.length).fill(0);   // 0=normal 1=billig 2=teuer
+  const prices=new Array(CFG.drugs.length).fill(0);
+  let numEvents=0;
+  if(brandom(0,100)<70) numEvents=1;
+  if(numEvents===1 && brandom(0,100)<40) numEvents=2;
+  if(numEvents===2 && brandom(0,100)<5)  numEvents=3;
+  const eligible=CFG.drugs.map((d,i)=>i).filter(i=>CFG.drugs[i].cheap||CFG.drugs[i].expensive);
+  while(numEvents>0 && eligible.length){
+    const i=eligible.splice(brandom(0,eligible.length),1)[0];
+    if(CFG.drugs[i].expensive && (!CFG.drugs[i].cheap || brandom(0,100)<50)){
+      deals[i]=2; prices[i]=Math.round(prandom(CFG.drugs[i].min,CFG.drugs[i].max)*CFG.expensiveMultiply);
+    }else{
+      deals[i]=1; prices[i]=Math.round(prandom(CFG.drugs[i].min,CFG.drugs[i].max)/CFG.cheapDivide);
+    }
+    numEvents--;
+  }
+  const loc=CFG.locations[S.loc];
+  let n=brandom(Math.min(loc.minDrug,loc.maxDrug),Math.max(loc.minDrug,loc.maxDrug));
+  if(n>CFG.drugs.length) n=CFG.drugs.length;
+  let rest=n-prices.filter(p=>p>0).length, guard=300;
+  while(rest>0 && guard-->0){
+    const i=brandom(0,CFG.drugs.length);
+    if(prices[i]===0){ prices[i]=normalPrice(CFG.drugs[i],loc); rest--; }
+  }
+  S.market=prices.map((p,i)=>({price:p,deal:deals[i]}));
+}
+
+/* Normaler Tagespreis. Gefragte Ware (hot, z. B. Crack) wird meist nahe am
+   Maximum gehandelt — je mehr Polizei am Ort ist, desto knapper das Angebot
+   und desto höher der Preis. Selten bricht der Markt ein (Preis nahe Min). */
+function normalPrice(dr,loc){
+  if(!dr.hot) return Math.round(prandom(dr.min,dr.max));
+  const hot=Math.min(95,70+2*loc.police);      // Polizei 5 → 80 %, 10 → 90 % heiße Tage
+  if(brandom(0,100)>=hot){                     // Markteinbruch
+    return Math.round(dr.min+(dr.max-dr.min)*Math.pow(prandom(0,1),3));
+  }
+  const k=2+loc.police/5;                      // Polizei drückt den Preis ans Maximum
+  return Math.round(dr.max-(dr.max-dr.min)*Math.pow(prandom(0,1),k));
+}
+
+function announceSpecials(){
+  S.market.forEach((m,i)=>{
+    if(m.deal===1) log(tc(CFG.drugs[i].cheapStr),"good");
+    if(m.deal===2) log(tc(pick(CFG.expensiveStr)).replace(/%Tde/g,dn(i)),"bad");
+  });
+}
+
+/* ================= Reisen & Ereignisse ================= */
+function jetTo(i){
+  if(S.over) return;
+  if(S.turn>=CFG.numTurns){ endGame("zeit"); return; }
+  S.turn++; S.day.setDate(S.day.getDate()+1);
+  S.debt=Math.floor(S.debt*(100+CFG.debtInterest)/100);
+  S.bank=Math.floor(S.bank*(100+CFG.bankInterest)/100);
+  // Huren erwirtschaften täglich Geld — Monatslimit gilt pro 30-Tage-Block
+  if(S.bitches>0 && CFG.bitchEarnMax>0){
+    const month=Math.floor((S.turn-1)/30);          // Tag 1-30, 31-60, ...
+    if(S.hureMonth!==month){ S.hureMonth=month; S.hureEarned=0; S.hureCapLogged=false; }
+    if(typeof S.hureEarned!=="number") S.hureEarned=0;
+    const lo=Math.min(CFG.bitchEarnMin,CFG.bitchEarnMax);
+    const hi=Math.max(CFG.bitchEarnMin,CFG.bitchEarnMax);
+    let earn=0;
+    for(let j=0;j<S.bitches;j++) earn+=lo+Math.floor(Math.random()*(hi-lo+1));
+    if(CFG.bitchEarnCap>0){
+      const frei=CFG.bitchEarnCap-S.hureEarned;
+      earn=Math.max(0,Math.min(earn,frei));
+    }
+    S.hureEarned=(S.hureEarned||0)+earn;
+    S.cash+=earn;
+    if(earn>0){
+      log(S.bitches===1
+        ?E("Deine {0} hat {1} eingenommen.",nm("bitch"),fmt(earn))
+        :E("Deine {0} {1} haben {2} eingenommen.",S.bitches,nm("bitches"),fmt(earn)),"good");
+    }else if(!S.hureCapLogged){
+      log(E("Deine {0} haben in diesem Monat (30 Tage) das Limit von {1} erreicht — heute bleibt nichts übrig.",nm("bitches"),fmt(CFG.bitchEarnCap)),"dim");
+      S.hureCapLogged=true;
+    }
+  }
+  S.loc=i;
+  log(E("Du reist nach {0}.",lnm(i)));
+  generateMarket();
+  announceSpecials();
+  // U-Bahn-Sager (15%)
+  if(brandom(0,100)<15){
+    let s=tc(pick(CFG.subwaySaying));
+    if(brandom(0,100)<30) s+=E(" (Zumindest glaubst du das.)");
+    log(E("Eine Dame in der Ubahn sagt: „{0}“",s),"dim");
+  }
+  // Hauptereignis (Objektangebot / Überfall / Bullen) — wie E_OFFOBJECT
+  const money=S.cash+S.bank-S.debt;
+  const gate=money>3000000?130 : money>1000000?115 : 100;
+  if(brandom(0,gate)>75) sendCopOffer();
+  render();
+}
+
+function sendCopOffer(){
+  const r=brandom(0,80+CFG.locations[S.loc].police);
+  if(r<33) offerObject();
+  else if(r<50) randomOffer();
+  else if(CFG.cops.length>0 && CFG.guns.length>0) startFight(false);
+}
+
+function offerObject(){
+  if(Math.random()<0.5){
+    const price=Math.round(prandom(CFG.bitchMin,CFG.bitchMax)/10);
+    showYesNo(E("Eine {0} bietet dir an, für dich zu arbeiten. Preis: {1}. Anheuern?",nm("bitch"),fmt(price)),()=>{
+      if(S.cash<price){ log(E("Du hast nicht genug Bargeld."),"bad"); return; }
+      S.cash-=price; S.bitches++;
+      log(E("Die {0} arbeitet jetzt für dich. (+10 Platz)",nm("bitch")),"good");
+      render();
+    });
+  }else{
+    const gi=brandom(0,CFG.guns.length), g=CFG.guns[gi];
+    const price=Math.round(g.price/10);
+    if(freeSpace()>=g.space){
+      showYesNo(E("Ein Typ macht dir ein Angebot: {0} für {1} (Schaden {2}, Platz {3}). Kaufen?",gnm(gi),fmt(price),g.damage,g.space),()=>{
+        if(S.cash<price){ log(E("Du hast nicht genug Bargeld."),"bad"); return; }
+        if(freeSpace()<g.space){ log(E("Kein Platz mehr im Mantel."),"bad"); return; }
+        S.cash-=price; S.guns[gi]++;
+        log(E("Du hast eine(n) {0} für {1} gekauft.",gnm(gi),fmt(price)),"good");
+        render();
+      });
+    }
+  }
+}
+
+function randomOffer(){
+  const r=brandom(0,100);
+  if(r<10){                                     // ausgeraubt
+    const lose=Math.floor(S.cash*brandom(80,95)/100);
+    S.cash-=lose;
+    log(E("Du wurdest überfallen und um {0} erleichtert!",fmt(lose)),"bad");
+  }else if(r<30){                               // Kumpel gibt / nimmt Waren
+    const i=brandom(0,CFG.drugs.length), amt=brandom(3,6);
+    if(Math.random()<0.5){
+      const n=Math.min(amt,freeSpace());
+      if(n>0){ S.drugs[i].n+=n; log(E("Ein alter Kumpel schenkt dir {0} {1}.",n,dn(i)),"good"); }
+    }else{
+      const n=Math.min(amt,S.drugs[i].n);
+      if(n>0){ S.drugs[i].n-=n; if(S.drugs[i].n===0)S.drugs[i].paid=0;
+        log(E("Ein Kumpel leiht sich {0} {1} — und kommt nie wieder.",n,dn(i)),"bad"); }
+    }
+  }else if(r<50){                               // Fund: Polizeihunde / Toter in der Ubahn
+    const i=brandom(0,CFG.drugs.length), n=Math.min(brandom(3,6),freeSpace());
+    if(n>0){ S.drugs[i].n+=n;
+      log(Math.random()<0.5
+        ? E("Streifenpolizisten haben {0} {1} fallen lassen. Einsammeln!",n,dn(i))
+        : E("Du findest {0} {1} bei einem Toten in der Ubahn.",n,dn(i)),"good"); }
+  }else if(r<60){                               // Mamas Brownies fressen Weed/Hasch
+    const cands=[drugIdxByName("Weed"),drugIdxByName("Hasch")].filter(i=>i>=0 && S.drugs[i].n>0);
+    if(cands.length>0){
+      const i=pick(cands);
+      const n=Math.min(brandom(2,5),S.drugs[i].n);
+      if(n>0){ S.drugs[i].n-=n; if(S.drugs[i].n===0)S.drugs[i].paid=0;
+        log(E("Mamas Brownies waren der Hammer! Leider haben sie {0} {1} gefressen.",n,dn(i)),"bad"); }
+    }
+  }else if(r<65 && drugIdxByName("Weed")>=0){   // Paraquat — Tod bei "Ja"
+    const wi=drugIdxByName("Weed");
+    showYesNo(E("Hier ist etwas {0}, das nach Paraquat riecht! Nehmst du es mit?",dn(wi)),
+      ()=>playerDeath("paraquat"), null, true);
+  }else{                                        // angehalten um ...
+    const t=tc(pick(CFG.stoppedTo)), c=Math.min(S.cash,brandom(1,10));
+    S.cash-=c;
+    log(E("Du hältst an, um {0}. Das kostet dich {1}.",t,fmt(c)),"dim");
+  }
+}
+
+/* ================= Polizeikampf ================= */
+function startFight(fromDrop){
+  const copIdx=Math.min(S.copLevel,CFG.cops.length-1);
+  const cop=CFG.cops[copIdx];
+  F={copIdx,cop,dep:brandom(cop.minDep,cop.maxDep),copHp:100,
+     copCash:brandom(100,2000),done:false,msgs:[]};
+  const depTxt=F.dep===1?E("ein {0}",nm("deputy")):`${F.dep} ${nm("deputies")}`;
+  F.msgs.push({t:E("{0} und {1} greifen dich an!",cnm(copIdx),depTxt)+(fromDrop?E(" Beim Wegwerfen erwischt!"):""),c:"bad"});
+  if(gunsTotal()===0) F.msgs.push({t:E("Du hast keine Waffe — du kannst nur rennen!"),c:"dim"});
+  renderFight();
+}
+
+function fmsg(t,c){ F.msgs.push({t,c}); }
+
+function renderFight(){ openModal(fightHtml(),{fight:true,lock:true}); }
+
+function fightHtml(){
+  const canFire=gunsTotal()>0 && !F.done;
+  const btns=F.done
+    ? `<button class="amber" onclick="closeFight()">${E("Weiter")}</button>`
+    : `${canFire?`<button title="${E("Mit allen Waffen gleichzeitig auf die Bullen schießen")}" onclick="fightFire()">${E("Feuern")}</button>`:''}
+       <button class="warn" title="${E("Fliehen — ca. 60% Chance, sonst schießt {0} zurück",F?cnm(F.copIdx):E("der Cop"))}" onclick="fightRun()">${E("Rennen")}</button>`;
+  const lines=F.msgs.map(m=>`<p class="${m.c}">${m.t}</p>`).join("");
+  return `<h3>${E("Feuergefecht!")}</h3>
+    <div class="small">${E("{0} — Gesundheit {1}% — {2}: {3}",lnm(S.loc),S.health,nm("bitches"),S.bitches)}</div>
+    <div class="flist" id="flog">${lines}</div>
+    <div class="row">${btns}</div>`;
+}
+
+function updateFight(){
+  const box=el("mbox"); box.innerHTML=fightHtml();
+  const fl=el("flog"); fl.scrollTop=fl.scrollHeight;
+}
+
+function fightFire(){
+  if(F.done||gunsTotal()===0) return;
+  let atk=80; CFG.guns.forEach((g,i)=>{atk+=g.damage*S.guns[i];});
+  const def=Math.max(10,100-5*F.dep-F.cop.defPen);
+  const armor=F.dep>0?F.cop.deputyArmor:F.cop.armor;
+  if(brandom(0,atk)>brandom(0,def)){
+    let dmg=0; CFG.guns.forEach((g,i)=>{for(let j=0;j<S.guns[i];j++)dmg+=brandom(0,g.damage);});
+    dmg=Math.floor(dmg*100/armor);
+    if(F.copHp<=dmg && F.dep>0){
+      F.dep--; F.copHp=100;
+      fmsg(F.dep>0?`Du hast einen ${CFG.names.deputyAcc} erschossen! (Noch ${F.dep} da)`
+              :`Kein ${CFG.names.deputy} mehr übrig — nur noch ${F.cop.name}!`,"good");
+    }else if(F.copHp<=dmg){ winFight(); return; }
+    else{ F.copHp-=dmg; fmsg(`Du triffst ${F.cop.name} (-${dmg} HP).`,"good"); }
+  }else fmsg("Du schießt daneben.","dim");
+  copFire();
+}
+
+function copFire(){
+  if(F.done||S.over) return;
+  const units=F.dep+1, g=CFG.guns[Math.min(F.cop.gunIndex,CFG.guns.length-1)];
+  const atk=80+g.damage*units-F.cop.atkPen;
+  const def=Math.max(10,100-5*S.bitches);
+  if(brandom(0,atk)>brandom(0,def)){
+    const armor=S.bitches>0?CFG.bitchArmor:CFG.playerArmor;
+    let dmg=0; for(let j=0;j<units;j++)dmg+=brandom(0,g.damage);
+    dmg=Math.max(1,Math.floor(dmg*100/armor));
+    if(S.health<=dmg){
+      if(S.bitches>0){
+        S.bitches--; S.health=100;
+        fmsg(E("{0} trifft — eine deiner {1} ist gefallen! Sie hat dich gerettet.",cnm(F.copIdx),nm("bitches")),"bad");
+      }else{
+        fmsg(E("{0} trifft dich tödlich. (-{1} HP)",cnm(F.copIdx),dmg),"bad");
+        playerDeath("erschossen"); return;
+      }
+    }else{ S.health-=dmg; fmsg(E("{0} trifft dich! (-{1} HP)",cnm(F.copIdx),dmg),"bad"); }
+  }else fmsg(E("{0} schießt daneben.",cnm(F.copIdx)),"dim");
+  updateFight();
+}
+
+function fightRun(){
+  if(F.done) return;
+  if(brandom(0,100)<60){
+    if(brandom(0,100)<30) S.copLevel=Math.max(0,S.copLevel-1);
+    fmsg(E("Du bist entkommen!"),"good");
+    F.done=true;
+    log(E("Du bist vor {0} entkommen.",cnm(F.copIdx)),"good");
+  }else{ fmsg(E("Du kommst nicht weg!"),"bad"); }
+  updateFight();
+  if(!F.done) copFire();
+}
+
+function winFight(){
+  S.cash+=F.copCash;
+  S.copLevel=Math.min(S.copLevel+1,CFG.cops.length-1); // letzter Cop kehrt immer wieder
+  fmsg(E("Du hast {0} erledigt! Auf dem Leichnam findest du {1}.",cnm(F.copIdx),fmt(F.copCash)),"good");
+  log(E("Du hast {0} erledigt und {1} genommen.",cnm(F.copIdx),fmt(F.copCash)),"good");
+  F.done=true;
+  updateFight();
+}
+
+function closeFight(){
+  closeModal(true); F=null; render();
+  if(S && !S.over && brandom(0,100)>CFG.locations[S.loc].police){
+    const price=Math.round(prandom(CFG.bitchMin,CFG.bitchMax)*S.health/500);
+    if(S.health<100){
+      showYesNo(E("Ein Arzt bietet an, dich zusammenzunähen. Preis: {0} (Gesundheit: {1}%). Annehmen?",fmt(price),S.health),()=>{
+        if(S.cash>=price){ S.cash-=price; S.health=100; log(E("Der Arzt näht dich zusammen. (Gesundheit 100%)"),"good"); }
+        else log(E("Du hast nicht genug Bargeld für den Arzt."),"bad");
+        render();
+      });
+    }
+  }
+}
+
+/* ================= Tod / Spielende ================= */
+function playerDeath(reason){
+  S.over=true;
+  if(reason==="paraquat") log(E("Der Paraquat tötet dich auf der Stelle."),"bad");
+  else if(reason==="erschossen") log(E("{0} hat dich erschossen.",F?cnm(F.copIdx):E("Die Polizei")),"bad");
+  else log(E("Du bist tot."),"bad");
+  closeModal(true); F=null;
+  endGame(reason);
+}
+
+function endGame(reason){
+  clearAutosave();
+  const score=S.cash+S.bank-S.debt;
+  el("gamescreen").classList.add("hidden");
+  el("gameover").classList.remove("hidden");
+  el("goreason").textContent=
+    reason==="erschossen"?E("Du wurdest von der Polizei erschossen.")
+    :reason==="paraquat"?E("Das Paraquat war keine gute Idee.")
+    :reason==="pleite"?E("Komplett pleite — Bargeld und Konto auf null, nichts mehr zu verkaufen.")
+    :reason==="zeit"?E("Deine {0} Tage sind vorbei.",CFG.numTurns)
+    :E("Du hast aufgegeben.");
+  el("goscore").textContent=fmt(score);
+  el("goname").value=S.name;
+  const neg=score<0;
+  el("gosaveRow").style.display=neg?"none":"";
+  const note=el("gonote");
+  note.style.display=neg?"":"none";
+  note.textContent=neg?E("Negative Punkte — nichts für die Hall of Fame."):"";
+  renderScoreTable(el("goscores"),null);
+  el("goname").dataset.score=score;
+}
+
+/* Konkurs: ohne Bargeld, Konto, Waren, Waffen und Huren ist das Spiel vorbei */
+function checkBroke(){
+  if(!S || S.over) return;
+  if(S.cash<=0 && S.bank<=0 && drugsTotal()===0 && gunsTotal()===0 && S.bitches===0){
+    S.over=true;
+    log(E("Du bist komplett pleite. Aus."),"bad");
+    endGame("pleite");
+  }
+}
+
+function loadScores(){
+  let list=[];
+  try{ const s=JSON.parse(localStorage.getItem(HIKEY)||"null");
+       if(Array.isArray(s)) list=s; }catch(e){}
+  return normalizeScores(list);            // keine Minus-Punkte, 1 Platz pro Name, max. 10
+}
+/* Hall of Fame normalisieren: keine Minus-Punkte, max. 10 Plätze
+   (mehrere Einträge desselben Namens sind erlaubt) */
+function normalizeScores(list){
+  return (list||[])
+    .filter(s=>s && typeof s.score==="number" && isFinite(s.score) && s.score>=0)
+    .map(s=>({name:String(s.name||E("Anonym")).slice(0,20),date:String(s.date||""),
+              score:Math.round(s.score)}))
+    .sort((a,b)=>b.score-a.score)
+    .slice(0,10);
+}
+function persistScores(list){
+  try{ localStorage.setItem(HIKEY,JSON.stringify(list)); }catch(e){}
+  saveExternal();
+}
+function todayStr(){
+  const d=new Date(),p=x=>(""+x).padStart(2,"0");
+  return `${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()}`;
+}
+/* Neuer Eintrag: Liste nicht voll -> jeder Lauf kommt rein (Name mehrfach möglich).
+   Liste voll (10 Plätze) -> eigener Name nur über persönlichen Rekord,
+   fremde Namen nur wenn sie den letzten Platz übersteigen. */
+function insertScore(name,score){
+  if(!isFinite(score)||score<0)
+    return {ok:false,msg:E("Negative Punkte haben in der Hall of Fame nichts verloren.")};
+  let list=loadScores();
+  const k=(name||E("Anonym")).trim().toLowerCase()||"anonym";
+  const rankOf=()=>list.findIndex(s=>s.name.trim().toLowerCase()===k && s.score===score)+1;
+
+  if(list.length<10){
+    list.push({name,date:todayStr(),score});
+    list.sort((a,b)=>b.score-a.score);
+    persistScores(list);
+    return {ok:true,msg:E("Platz {0} in der Hall of Fame mit {1}!",rankOf(),fmt(score))};
+  }
+  const own=list.filter(s=>s.name.trim().toLowerCase()===k);
+  if(own.length===0){
+    if(score<=list[list.length-1].score)
+      return {ok:false,msg:E("Reicht nicht für die Top 10 (nötig: mehr als {0}).",fmt(list[list.length-1].score))};
+    list.push({name,date:todayStr(),score});
+    list.sort((a,b)=>b.score-a.score);
+    list=list.slice(0,10);
+    persistScores(list);
+    return {ok:true,msg:E("Platz {0} in der Hall of Fame mit {1}!",rankOf(),fmt(score))};
+  }
+  const ownBest=Math.max(...own.map(s=>s.score));
+  if(score<=ownBest)
+    return {ok:false,msg:E("Dein bester Eintrag ({0}) bleibt stehen — der neue war schlechter.",fmt(ownBest))};
+  list.sort((a,b)=>b.score-a.score);
+  let wIdx=-1,wScore=Infinity;
+  list.forEach((s,idx)=>{
+    if(s.name.trim().toLowerCase()===k && s.score<wScore){ wScore=s.score; wIdx=idx; }
+  });
+  if(wIdx>=0) list.splice(wIdx,1);
+  list.push({name,date:todayStr(),score});
+  list.sort((a,b)=>b.score-a.score);
+  persistScores(list);
+  return {ok:true,msg:E("Neuer persönlicher Rekord: Platz {0} mit {1}!",rankOf(),fmt(score))};
+}
+function saveScore(){
+  const name=el("goname").value.trim()||E("Anonym");
+  const score=parseInt(el("goname").dataset.score,10)||0;
+  const res=insertScore(name,score);
+  const note=el("gonote");
+  note.style.display="";
+  note.textContent=res.msg;
+  renderScoreTable(el("goscores"),res.ok?name:null);
+}
+function renderScoreTable(container,highlight){
+  const list=loadScores();
+  const rows=list.length
+    ? list.map((s,i)=>`<tr${s.name===highlight?' style="color:var(--accent)"':''}>
+        <td>${i+1}</td><td>${String(s.name).replace(/[<>&]/g,"")}</td>
+        <td class="num small">${s.date}</td><td class="num">${fmt(s.score)}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="small">${E("— noch keine Einträge —")}</td></tr>`;
+  container.innerHTML=`<table class="scores"><tr><th>#</th><th>${E("Name")}</th><th class="num">${E("Datum")}</th><th class="num">${E("Punkte")}</th></tr>${rows}</table>`;
+}
+
+/* ================= Kaufen / Verkaufen / Wegwerfen ================= */
+function showBuy(i){
+  const m=S.market[i],d=S.drugs[i];
+  const max=Math.min(Math.floor(S.cash/m.price),freeSpace());
+  openModal(`<h3>${E("{0} kaufen",dn(i))}</h3>
+    <div class="big">${E("Preis: {0}",fmt(m.price))}</div>
+    <div class="small">${E("Bargeld: {0} · Platz frei: {1} · max. {2}",fmt(S.cash),freeSpace(),max)}</div>
+    <input id="amt" type="text" inputmode="numeric" value="${max}">
+    <div class="amtbtns">
+      <button onclick="amtSet(1)">+1</button><button onclick="amtSet(10)">+10</button>
+      <button onclick="amtSet(${max})">${E("Max")}</button>
+    </div>
+    <div class="row"><button class="amber" onclick="buyDo(${i})">${E("Kaufen")}</button>
+    <button onclick="closeModal()">${E("Abbrechen")}</button></div>`);
+}
+function buyDo(i){
+  const n=clampAmt(S.market[i].price);
+  if(n<=0){ closeModal(); return; }
+  const m=S.market[i],d=S.drugs[i];
+  const max=Math.min(Math.floor(S.cash/m.price),freeSpace());
+  const q=Math.min(n,max);
+  if(q<=0){ closeModal(); return; }
+  d.paid=d.n===0?m.price:(d.paid*d.n+m.price*q)/(d.n+q);
+  d.n+=q; S.cash-=m.price*q;
+  log(E("{0} {1} gekauft für {2}.",q,dn(i),fmt(m.price*q)),"dim");
+  closeModal(); render();
+}
+function showSell(i){
+  const m=S.market[i],d=S.drugs[i];
+  openModal(`<h3>${E("{0} verkaufen",dn(i))}</h3>
+    <div class="big">${E("Preis: {0}",fmt(m.price))}</div>
+    <div class="small">${E("Im Mantel: {0} · ø bezahlt: {1}",d.n,fmt(d.paid||0))}</div>
+    <input id="amt" type="text" inputmode="numeric" value="${d.n}">
+    <div class="amtbtns">
+      <button onclick="amtSet(1)">+1</button><button onclick="amtSet(10)">+10</button>
+      <button onclick="amtSet(${d.n})">${E("Alles")}</button>
+    </div>
+    <div class="row"><button class="amber" onclick="sellDo(${i})">${E("Verkaufen")}</button>
+    <button onclick="closeModal()">${E("Abbrechen")}</button></div>`);
+}
+function sellDo(i){
+  const n=clampAmt(0), d=S.drugs[i];
+  const q=Math.min(n,d.n);
+  if(q<=0){ closeModal(); return; }
+  S.cash+=S.market[i].price*q; d.n-=q; if(d.n===0)d.paid=0;
+  log(E("{0} {1} verkauft für {2}.",q,dn(i),fmt(S.market[i].price*q)),"good");
+  closeModal(); render();
+}
+function showDrop(i){
+  const d=S.drugs[i];
+  openModal(`<h3>${E("{0} wegwerfen",dn(i))}</h3>
+    <div class="small">${E("Im Mantel: {0}. Bringt kein Geld — und die Bullen sehen dich eventuell!",d.n)}</div>
+    <input id="amt" type="text" inputmode="numeric" value="${d.n}">
+    <div class="amtbtns"><button onclick="amtSet(${d.n})">${E("Alles")}</button></div>
+    <div class="row"><button class="warn" title="${E("Ausgewählte Menge endgültig wegwerfen")}" onclick="dropDo(${i})">${E("Wegwerfen")}</button>
+    <button onclick="closeModal()">${E("Abbrechen")}</button></div>`);
+}
+function dropDo(i){
+  const n=clampAmt(0), d=S.drugs[i];
+  const q=Math.min(n,d.n);
+  if(q<=0){ closeModal(); return; }
+  d.n-=q; if(d.n===0)d.paid=0;
+  log(E("Du wirfst {0} {1} weg.",q,dn(i)),"dim");
+  closeModal(); render();
+  if(brandom(0,100)<CFG.locations[S.loc].police) startFight(true);
+}
+function amtSet(v){ el("amt").value=v; }
+function clampAmt(){ const v=parseInt((""+el("amt").value).replace(/\./g,""),10); return isNaN(v)?0:Math.max(0,v); }
+
+/* ================= Kredithai / Bank / Waffenladen / Kneipe ================= */
+function showLoan(){
+  openModal(`<h3>${nm("loanShark")}</h3>
+    <div class="big">${E("Schulden: {0}",fmt(S.debt))}</div>
+    <div class="small">${E("Bargeld: {0} · Zinsen: {1}% pro Tag",fmt(S.cash),CFG.debtInterest)}</div>
+    <input id="amt" type="text" placeholder="${E("Betrag (z.B. 2500 oder 2.5k)")}">
+    <div id="loanhint" style="min-height:16px;color:var(--danger);font-size:13px"></div>
+    <div class="row">
+      <button class="amber" title="${E("So viel wie möglich auf die Schulden zahlen — Achtung: kann dich auf 0 € bringen")}" onclick="loanPayAll()">${E("Alles bezahlen")}</button>
+      <button title="${E("Eingegebenen Betrag auf die Schulden zahlen")}" onclick="loanPay()">${E("Zurückzahlen")}</button>
+      <button class="warn" title="${E("Geld leihen — Schulden wachsen {0}% pro Tag",CFG.debtInterest)}" onclick="loanBorrow()">${E("Leihen")}</button>
+      <button onclick="closeModal()">${E("Schließen")}</button>
+    </div>`);
+}
+function loanHint(t){ const h=el("loanhint"); if(h) h.textContent=t||""; }
+function loanPayAll(){
+  const q=Math.min(S.cash,S.debt);
+  if(q<=0){
+    loanHint(S.debt<=0?E("Du hast keine Schulden mehr."):E("Du hast kein Bargeld, um zu zahlen."));
+    return;
+  }
+  loanAsk(q);          // Bestätigung bei JEDEM Klick auf "Alles bezahlen"
+}
+function loanPay(){
+  const n=parseAmount(el("amt").value);
+  if(isNaN(n)){ loanHint(E("Bitte zuerst einen Betrag eingeben (z. B. 1000 oder 1k).")); return; }
+  const q=Math.min(n,S.cash,S.debt);
+  if(q<=0){ loanHint(S.debt<=0?E("Du hast keine Schulden."):E("Du hast kein Bargeld, um zu zahlen.")); return; }
+  if(S.cash-q<=0 && S.bank<=0){ loanWarn(q); return; }
+  doLoanPay(q);
+}
+function doLoanPay(q){
+  S.cash-=q; S.debt-=q;
+  loanHint("");
+  log(E("Schulden um {0} verringert. Restschuld: {1}.",fmt(q),fmt(S.debt)),"good");
+  closeModal(); render();
+}
+/* Bestätigung für "Alles bezahlen" — immer, mit Folgen-Angabe */
+function loanAsk(q){
+  window._loanPay=q;
+  const rest=S.debt-q, restCash=S.cash-q, drugs=drugsTotal();
+  let text=E("Du zahlst <b>{0}</b>. Danach: Restschuld <b>{1}</b>, Bargeld <b>{2}</b>",fmt(q),fmt(rest),fmt(restCash));
+  if(restCash<=0 && S.bank<=0){
+    text+=drugs>0
+      ? E(" — du bist dann komplett pleite (deine {0} Einheiten Ware behältst du, mehr nicht)!",drugs)
+      : E(" — und damit wäre das <b>Spiel vorbei</b>!");
+  }
+  text+=E(". Wirklich bezahlen?");
+  openModal(`<h3>${E("⚠ Bestätigung")}</h3><p style="line-height:1.7">${text}</p>
+    <div class="row"><button class="warn" onclick="loanPayDo()">${E("Ja, bezahlen")}</button>
+    <button class="amber" onclick="showLoan()">${E("Nein, abbrechen")}</button></div>`);
+}
+/* Warnung nur für "Zurückzahlen", wenn der Betrag alles auffrisst (0 € + 0 €) */
+function loanWarn(q){
+  window._loanPay=q;
+  const drugs=drugsTotal();
+  const text=drugs>0
+    ?E("Bezahlest du <b>{0}</b>, bleibst du mit <b>€0 Bargeld</b> und <b>€0 Konto</b> zurück. Du hast immerhin noch {1} Einheiten Ware dabei — mehr aber auch nicht! Wirklich alles bezahlen?",fmt(q),drugs)
+    :E("Bezahlest du <b>{0}</b>, bleibst du mit <b>€0 Bargeld</b> und <b>€0 Konto</b> zurück — und damit wäre das <b>Spiel vorbei</b>! Wirklich alles bezahlen?",fmt(q));
+  openModal(`<h3>${E("⚠ Achtung")}</h3><p style="line-height:1.7">${text}</p>
+    <div class="row"><button class="warn" onclick="loanPayDo()">${E("Ja, wirklich bezahlen")}</button>
+    <button class="amber" onclick="showLoan()">${E("Nein, doch nicht")}</button></div>`);
+}
+function loanPayDo(){
+  const q=window._loanPay||0; window._loanPay=null;
+  if(q>0) doLoanPay(q); else showLoan();
+}
+function loanBorrow(){
+  const n=parseAmount(el("amt").value);
+  if(isNaN(n)){ loanHint(E("Bitte zuerst einen Betrag eingeben (z. B. 1000 oder 1k).")); return; }
+  if(n<=0){ loanHint(E("Der Betrag muss größer als 0 sein.")); return; }
+  S.cash+=n; S.debt+=n;
+  log(E("{0} geliehen. Schulden jetzt: {1}.",fmt(n),fmt(S.debt)),"bad");
+  closeModal(); render();
+}
+function showBank(){
+  openModal(`<h3>${nm("bank")}</h3>
+    <div class="big">${E("Kontostand: {0}",fmt(S.bank))}</div>
+    <div class="small">${E("Bargeld: {0} · Zinsen: {1}% pro Tag · vor Räubern sicher",fmt(S.cash),CFG.bankInterest)}</div>
+    <input id="amt" type="text" placeholder="${E("Betrag (z.B. 1000 oder 1k)")}">
+    <div class="row">
+      <button title="${E("Bargeld aufs Konto — {0}% Zinsen pro Tag, vor Räubern sicher",CFG.bankInterest)}" onclick="bankDep()">${E("Einzahlen")}</button>
+      <button title="${E("Konto-Guthaben zurück ins Bargeld")}" onclick="bankWit()">${E("Auszahlen")}</button>
+      <button onclick="closeModal()">${E("Schließen")}</button>
+    </div>`);
+}
+function bankDep(){
+  const n=parseAmount(el("amt").value);
+  const q=Math.min(isNaN(n)?0:n,S.cash);
+  if(q<=0){ closeModal(); return; }
+  S.cash-=q; S.bank+=q; log(E("{0} eingezahlt.",fmt(q)),"dim");
+  closeModal(); render();
+}
+function bankWit(){
+  const n=parseAmount(el("amt").value);
+  const q=Math.min(isNaN(n)?0:n,S.bank);
+  if(q<=0){ closeModal(); return; }
+  S.bank-=q; S.cash+=q; log(E("{0} abgehoben.",fmt(q)),"dim");
+  closeModal(); render();
+}
+function showGunShop(){
+  const rows=CFG.guns.map((g,i)=>{
+    const can=S.cash>=g.price&&freeSpace()>=g.space;
+    return `<tr><td>${gnm(i)}</td><td class="num">${fmt(g.price)}</td>
+      <td class="num">${g.damage}</td><td class="num">${g.space}</td>
+      <td class="num"><button title="${E("{0} für {1} kaufen — braucht {2} Platz",gnm(i),fmt(g.price),g.space)}" ${can?"":"disabled"} onclick="buyGun(${i})">${E("Kaufen")}</button></td></tr>`;
+  }).join("");
+  const owned=CFG.guns.map((g,i)=>S.guns[i]>0
+    ?`<div class="stat"><span>${gnm(i)} ×${S.guns[i]}</span>
+       <button title="${E("{0} für {1} zurückgeben",gnm(i),fmt(g.price))}" onclick="sellGun(${i})">${E("Verkaufen {0}",fmt(g.price))}</button></div>`:"").join("");
+  openModal(`<h3>${nm("gunShop")}</h3>
+    <div class="small">${E("Bargeld: {0} · Platz frei: {1}",fmt(S.cash),freeSpace())}</div>
+    <table><tr><th>${E("Waffe")}</th><th class="num">${E("Preis")}</th><th class="num">${E("Schaden")}</th><th class="num">${E("Platz")}</th><th></th></tr>${rows}</table>
+    ${owned?`<h3 style="margin-top:12px">${E("Deine Waffen")}</h3>${owned}`:""}
+    <div class="row"><button onclick="closeModal()">${E("Verlassen")}</button></div>`);
+}
+function buyGun(i){
+  const g=CFG.guns[i];
+  if(S.cash<g.price||freeSpace()<g.space) return;
+  S.cash-=g.price; S.guns[i]++;
+  log(E("{0} gekauft für {1}.",gnm(i),fmt(g.price)),"good");
+  showGunShop(); render();
+}
+function sellGun(i){
+  const g=CFG.guns[i];
+  if(S.guns[i]<=0) return;
+  S.guns[i]--; S.cash+=g.price;
+  log(E("{0} verkauft für {1}.",gnm(i),fmt(g.price)),"dim");
+  showGunShop(); render();
+}
+function showPub(){
+  const price=Math.round(prandom(CFG.bitchMin,CFG.bitchMax));
+  openModal(`<h3>${nm("pub")}</h3>
+    <div class="small">${E("Dunkle Ecke, rauchige Luft. Eine {0} will für dich arbeiten.",nm("bitch"))}</div>
+    <div class="big">${E("Preis: {0}",fmt(price))}</div>
+    <div class="small">${E("Jede {0} gibt +{1} Platz und rettet dir einmal das Leben. Bargeld: {2}",nm("bitch"),CFG.bitchSpace,fmt(S.cash))}</div>
+    <div class="row">
+      <button class="amber" title="${E("{0} anheuern — +{1} Platz, rettet einmal das Leben",nm("bitch"),CFG.bitchSpace)}" onclick="hireBitch(${price})">${E("Anheuern")}</button>
+      <button onclick="closeModal()">${E("Verlassen")}</button>
+    </div>`);
+}
+function hireBitch(price){
+  if(S.cash<price){ log(E("Du hast nicht genug Bargeld."),"bad"); return; }
+  S.cash-=price; S.bitches++;
+  log(E("Eine neue {0} arbeitet für dich. (+{1} Platz)",nm("bitch"),CFG.bitchSpace),"good");
+  showPub(); render();
+}
+
+/* ================= Reisen-Modal ================= */
+function showTravel(){
+  const btns=CFG.locations.map((l,i)=>i===S.loc?""
+    :`<button title="${E("Nach {0} reisen (1 Tag, Polizei: {1}%)",lnm(i),l.police)}" onclick="jetTo(${i});closeModal()">${lnm(i)}</button>`).join("");
+  openModal(`<h3>${E("Wohin reisen?")}</h3>
+    <div class="small">${E("Jede Reise kostet einen Tag ({0}/{1}). Du bist gerade in {2}.",S.turn,CFG.numTurns,lnm(S.loc))}</div>
+    <div class="row" style="flex-direction:column">${btns}</div>`);
+}
+
+/* ================= Modal-Basis ================= */
+let modalLock=false;
+function openModal(html,opts){
+  opts=opts||{};
+  modalLock=!!opts.lock;
+  const box=el("mbox");
+  box.className=opts.fight?"fight":(opts.settings?"settings":"");
+  box.innerHTML=html;
+  box.scrollTop=0;          // Dialogwechsel: nicht die alte Scrollposition erben
+  el("overlay").classList.remove("hidden");
+}
+function closeModal(force){ if(modalLock&&!force)return; modalLock=false; el("overlay").classList.add("hidden"); }
+function showYesNo(text,onYes,fightMode){
+  window._yesFn=onYes;
+  openModal(`<h3>${E("Angebot")}</h3><p style="line-height:1.6">${text}</p>
+    <div class="row"><button class="amber" onclick="modalYes()">${E("Ja")}</button>
+    <button onclick="closeModal()">${E("Nein")}</button></div>`,{fight:!!fightMode});
+}
+function modalYes(){ const f=window._yesFn; closeModal(); window._yesFn=null; if(f)f(); }
+el("overlay").addEventListener("click",e=>{ if(e.target.id==="overlay") closeModal(); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ================= Einstellungen (Config-Editor) ================= */
+let cfgDraft=null;
+
+function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+function cfgField(k,label,val,type,opts){
+  const L=E(label);                                     // Label in der Spielsprache
+  if(type==="sel")
+    return `<label>${L}<select data-k="${k}">${(opts||[]).map(o=>
+      `<option value="${o[0]}"${val===o[0]?" selected":""}>${o[1]}</option>`).join("")}</select></label>`;
+  if(type==="num")
+    return `<label>${L}<input type="text" inputmode="decimal" data-k="${k}" value="${esc(val)}"></label>`;
+  if(type==="bool")
+    return `<label class="cfgcheck"><input type="checkbox" data-k="${k}" ${val?"checked":""}> ${L}</label>`;
+  return `<label>${L}<input type="text" data-k="${k}" value="${esc(val)}"></label>`;
+}
+
+function openSettings(){
+  cfgDraft=JSON.parse(JSON.stringify(CFG));
+  renderSettings();
+}
+function renderSettings(){
+  openModal(settingsHtml(),{settings:true});
+}
+function cancelSettings(){ cfgDraft=null; closeModal(); }
+
+function settingsHtml(){
+  const d=cfgDraft;
+  let h=`<h3>${E("⚙ Einstellungen <span style=\"letter-spacing:normal;color:var(--dim);font-size:12px\">· Version {0}</span>",APP_VERSION)}</h3>`;
+  /* Aktions-Block (Speichern/Laden/Übernehmen) direkt unter dem Titel — so
+     ist er ohne langes Scrollen durch alle Konfig-Abschnitte erreichbar. */
+  h+=`<div class="cfgactions">`+settingsActionsHtml()+`</div>`;
+  h+=`<h4>${E("Allgemein")}</h4><div class="cfggrid">`
+    +cfgField("lang","Sprache / Language",d.lang,"sel",[["de","Deutsch"],["en","English"]])
+    +cfgField("currency","Währungssymbol",d.currency)
+    +cfgField("numTurns","Tage",d.numTurns,"num")
+    +cfgField("startCash","Startgeld",d.startCash,"num")
+    +cfgField("startDebt","Startschulden",d.startDebt,"num")
+    +cfgField("debtInterest","Schuldenzins %",d.debtInterest,"num")
+    +cfgField("bankInterest","Bankzins %",d.bankInterest,"num")
+    +cfgField("baseSpace","Mantelplatz",d.baseSpace,"num")
+    +cfgField("bitchSpace","Platz pro Hure",d.bitchSpace,"num")
+    +cfgField("cheapDivide","Billig-Teiler",d.cheapDivide,"num")
+    +cfgField("expensiveMultiply","Teuer-Faktor",d.expensiveMultiply,"num")
+    +cfgField("playerArmor","Spielerrüstung %",d.playerArmor,"num")
+    +cfgField("bitchArmor","Huren-Rüstung %",d.bitchArmor,"num")
+    +cfgField("bitchMin","Hure Min-Preis",d.bitchMin,"num")
+    +cfgField("bitchMax","Hure Max-Preis",d.bitchMax,"num")
+    +cfgField("bitchEarnMin","Hure Min-Verdienst/Tag",d.bitchEarnMin,"num")
+    +cfgField("bitchEarnMax","Hure Max-Verdienst/Tag",d.bitchEarnMax,"num")
+    +cfgField("bitchEarnCap","Huren-Max/Monat (30 Tage)",d.bitchEarnCap,"num")
+    +`</div>`;
+  h+=`<h4><span>${E("Orte")}</span><button class="cfgadd" onclick="cfgAddItem('locations')">${E("+ Ort")}</button></h4>`;
+  d.locations.forEach((l,i)=>{
+    h+=`<div class="cfgitem"><button class="cfgdel" title="${E("Ort entfernen")}" onclick="cfgRemoveItem('locations',${i})">✕</button>`
+      +cfgField(`locations.${i}.name`,"Name",l.name)
+      +cfgField(`locations.${i}.police`,"Polizei %",l.police,"num")
+      +cfgField(`locations.${i}.minDrug`,"Min Warenzahl",l.minDrug,"num")
+      +cfgField(`locations.${i}.maxDrug`,"Max Warenzahl",l.maxDrug,"num")
+      +`</div>`;
+  });
+  h+=`<h4><span>${E("Waren")}</span><button class="cfgadd" onclick="cfgAddItem('drugs')">${E("+ Ware")}</button></h4>`;
+  d.drugs.forEach((dr,i)=>{
+    h+=`<div class="cfgitem"><button class="cfgdel" title="${E("Ware entfernen")}" onclick="cfgRemoveItem('drugs',${i})">✕</button>`
+      +cfgField(`drugs.${i}.name`,"Name",dr.name)
+      +cfgField(`drugs.${i}.min`,"Min-Preis",dr.min,"num")
+      +cfgField(`drugs.${i}.max`,"Max-Preis",dr.max,"num")
+      +cfgField(`drugs.${i}.cheapStr`,"Billig-Nachricht",dr.cheapStr)
+      +cfgField(`drugs.${i}.cheap`,"kann billig",dr.cheap,"bool")
+      +cfgField(`drugs.${i}.expensive`,"kann teuer",dr.expensive,"bool")
+      +cfgField(`drugs.${i}.hot`,"gefragt (Preis meist hoch, steigt mit Polizei)",dr.hot,"bool")
+      +`</div>`;
+  });
+  h+=`<h4><span>${E("Waffen")}</span><button class="cfgadd" onclick="cfgAddItem('guns')">${E("+ Waffe")}</button></h4>`;
+  d.guns.forEach((g,i)=>{
+    h+=`<div class="cfgitem"><button class="cfgdel" title="${E("Waffe entfernen")}" onclick="cfgRemoveItem('guns',${i})">✕</button>`
+      +cfgField(`guns.${i}.name`,"Name",g.name)
+      +cfgField(`guns.${i}.price`,"Preis",g.price,"num")
+      +cfgField(`guns.${i}.space`,"Platz",g.space,"num")
+      +cfgField(`guns.${i}.damage`,"Schaden",g.damage,"num")
+      +`</div>`;
+  });
+  h+=`<h4><span>${E("Polizisten")}</span><button class="cfgadd" onclick="cfgAddItem('cops')">${E("+ Polizist")}</button></h4>`;
+  d.cops.forEach((c,i)=>{
+    h+=`<div class="cfgitem"><button class="cfgdel" title="${E("Polizist entfernen")}" onclick="cfgRemoveItem('cops',${i})">✕</button>`
+      +cfgField(`cops.${i}.name`,"Name",c.name)
+      +cfgField(`cops.${i}.armor`,"Rüstung %",c.armor,"num")
+      +cfgField(`cops.${i}.deputyArmor`,"Rüstung der Polizisten %",c.deputyArmor,"num")
+      +cfgField(`cops.${i}.minDep`,"Min Polizisten",c.minDep,"num")
+      +cfgField(`cops.${i}.maxDep`,"Max Polizisten",c.maxDep,"num")
+      +cfgField(`cops.${i}.atkPen`,"Angriffsmalus",c.atkPen,"num")
+      +cfgField(`cops.${i}.defPen`,"Verteidigungsmalus",c.defPen,"num")
+      +`</div>`;
+  });
+  h+=`<button class="cfgadd" onclick="cfgAddItem('cops')">${E("+ Polizist")}</button>`;
+  h+=`<h4>${E("Begriffe")}</h4><div class="cfggrid">`
+    +cfgField("names.bitch","Hure (Einzahl)",d.names.bitch)
+    +cfgField("names.bitches","Huren (Mehrzahl)",d.names.bitches)
+    +cfgField("names.deputy","Polizist (Einzahl)",d.names.deputy)
+    +cfgField("names.deputies","Polizisten (Mehrzahl)",d.names.deputies)
+    +cfgField("names.deputyAcc","Polizisten (Akkusativ)",d.names.deputyAcc)
+    +cfgField("names.loanShark","Kredithai",d.names.loanShark)
+    +cfgField("names.bank","Bank",d.names.bank)
+    +cfgField("names.gunShop","Waffenladen",d.names.gunShop)
+    +cfgField("names.pub","Kneipe",d.names.pub)
+    +`</div>`;
+  return h;
+}
+
+/* Datei-Buttons + Übernehmen/Abbrechen/Hilfe — steht oben unter dem Titel */
+function settingsActionsHtml(){
+  return `<h4>${E("Dateien (außerhalb des Browsers)")}</h4>
+      <div class="cfggrid filegrid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))">
+      <button title="${E("Laufendes Spiel als Datei sichern")}" onclick="saveGameFile()">${E("💾 Spiel speichern")}</button>
+      <button title="${E("Spielstand aus Datei laden und weiterspielen")}" onclick="loadGameFile()">${E("📂 Spiel laden")}</button>
+      <button title="${E("Highscore-Liste als Datei sichern")}" onclick="exportScores()">${E("💾 Highscores speichern")}</button>
+      <button title="${E("Highscores aus Datei laden und zusammenführen")}" onclick="importScores()">${E("📂 Highscores laden")}</button>
+      <button title="${E("Alle Einstellungen als Datei sichern")}" onclick="exportCfg()">💾 Config speichern</button>
+      <button title="${E("Einstellungen aus Datei laden (erst nach Übernehmen aktiv)")}" onclick="importCfg()">📂 Config laden</button>
+      <button class="warn" title="${E("Alle Einstellungen auf Werkseinstellungen zurücksetzen (mit Bestätigung)")}" onclick="resetCfg()">Reset</button>
+      </div>
+      <div class="extrow" style="justify-content:flex-start">
+        <span class="extstatus small"></span>
+        <button class="extconnect" title="${E("Einstellungen und Highscores aus externer Datei laden")}" onclick="connectExternalOpen()">${E("Einstellungen Laden")}</button>
+        <button class="extconnect" title="${E("Neue externe Datendatei anlegen (empfohlen: im Spielordner)")}" onclick="connectExternalNew()">${E("Neue Datei")}</button>
+        <button class="extdisconnect" title="${E("Verbindung zur externen Datei lösen — nichts wird gelöscht")}" onclick="disconnectExternal()">${E("✕ Trennen")}</button>
+        <button title="${E("Aktuelle Config, Highscores und laufendes Spiel sofort in die externe Datei schreiben")}" onclick="saveExternal()">${E("Extern Speichern")}</button>
+      </div>
+      <div class="row"><button class="amber" title="${E("Änderungen speichern und sofort anwenden")}" onclick="applySettings()">${E("Übernehmen")}</button>
+      <button title="${E("Änderungen verwerfen")}" onclick="cancelSettings()">${E("Abbrechen")}</button>
+      <button title="${E("Alle Funktionen im Spiel und in den Einstellungen erklärt")}" onclick="openHelp()">${E("❓ Hilfe")}</button></div>`;
+}
+
+/* ================= Hilfe-Dialog ================= */
+function openHelp(){
+  openModal(helpHtml(),{settings:true});
+}
+function helpHtml(){
+  const P="line-height:1.7";
+  const U="margin:4px 0 0 18px;padding:0;line-height:1.7";
+  return `<h3>${E("❓ Hilfe — alle Funktionen erklärt")}</h3>
+  <div class="row" style="margin-top:8px"><button onclick="renderSettings()">${E("⟲ Zurück zu den Einstellungen")}</button></div>
+  <p style="${P}">${E("Diese Hilfe beschreibt jeden Button und jedes Feld — im Spiel und hier in den Einstellungen. Zahlen in Klammern sind die Werkseinstellungen.")}</p>
+
+  <h4>${E("Spielziel &amp; Grundregeln")}</h4>
+  <p style="${P}">${E("Kaufe Waren billig, reise und verkaufe sie teuer. Nach <b>Tage</b> (62) ist Schluss — oder früher: wenn du erschossen wirst, an Paraquat stirbst oder komplett pleite bist. Am Ende zählt <b>Bargeld + Konto − Schulden</b> als Punktzahl für die Hall of Fame (negative Punkte zählen nicht). Dein Mantel fasst <b>Mantelplatz</b> (100) Einheiten für Waren <i>und</i> Waffen; jede Hure bringt <b>Platz pro Hure</b> (10) zusätzlich.")}</p>
+
+  <h4>${E("Startbildschirm")}</h4>
+  <ul style="${U}">
+    <li>${E("<b>Spiel starten</b> — neues Spiel mit dem Namen aus dem Eingabefeld (ohne Namen: „Anonym\").")}</li>
+    <li>${E("<b>📂 Spielstand laden</b> — gespeicherte Spielstand-Datei öffnen und weiterspielen.")}</li>
+    <li>${E("<b>⚙ Einstellungen</b> — öffnet diesen Konfigurations-Editor.")}</li>
+    <li>${E("<b>Einstellungen Laden / Neue Datei</b> — externe Datendatei verbinden (siehe „Externe Datei\").")}</li>
+    <li>${E("<b>Spiel fortsetzen</b> — erscheint nur bei laufendem Spiel: macht genau dort weiter, wo du aufgehört hast. Das Spiel wird nach jeder Aktion automatisch gesichert.")}</li>
+    <li>${E("<b>Farbschema</b> — vier Themes (Darkskin, BlueMoon, Creamy, Retro); die Auswahl wird gespeichert.")}</li>
+    <li>${E("<b>Hall of Fame</b> — Top 10 mit Datum. Neue Einträge gibt es nur am Spielende.")}</li>
+  </ul>
+
+  <h4>${E("Oberfläche im Spiel")}</h4>
+  <ul style="${U}">
+    <li>${E("<b>Kopfleiste</b> — Tag X/Y, Datum, aktueller Ort, Zahl der Huren, freier Platz, ⚙ Einstellungen, Farbschema, <b>💾 Spiel speichern</b> (Spielstand-Datei herunterladen), <b>📂 Spiel laden</b> (Spielstand aus Datei laden — ersetzt das laufende Spiel sofort) und <b>✚ Neu</b> (neues Spiel — überschreibt das aktuelle nach Bestätigung!).")}</li>
+    <li>${E("<b>Status-Panel</b> — Bargeld, Bankkonto, Schulden (rot), Gesundheit als Balken (unter 40 % rot) und deine Waffen.")}</li>
+    <li>${E("<b>Inventar</b> — mitgeführte Waren mit Menge und ø bezahltem Preis. <b>Weg</b> wirft Ware weg (kein Geld, Bullen-Risiko).")}</li>
+    <li>${E("<b>Markt</b> — heutige Preise am Ort. Hellcyan = Schnäppchen (sehr niedriger Preis), rot = Preisexplosion. <b>Crack</b> ist heiß begehrt und kostet meist ein Vermögen — je mehr Polizei am Ort, desto teurer; nur selten bricht der Preis ein. Klick auf die Spaltenköpfe <b>Ware/Preis</b> sortiert (1. Klick aufsteigend, 2. Klick absteigend); die <b>Sortierung</b>-Auswahl gilt nur für die aktuelle Sitzung.")}</li>
+    <li>${E("<b>Log</b> — Ereignisverlauf (grün = gut, rot = schlecht).")}</li>
+    <li>${E("<b>Aktionsleiste</b> — Reisen, Kredithai, Bank, Waffenladen, Kneipe. Auf dem Handy ist sie fest am unteren Bildschirmrand, der Inhalt läuft darunter weg.")}</li>
+  </ul>
+
+  <h4>${E("Kaufen, Verkaufen, Wegwerfen")}</h4>
+  <p style="${P}">${E("<b>Kaufen</b>: Menge frei wählbar (+1 / +10 / Max), begrenzt durch Bargeld und freien Platz — der komplette Platz lässt sich auf einmal aufkaufen. Eingabe: ganze Zahlen, Tausenderpunkte erlaubt (1.000). <b>Verkaufen</b> nur am aktuellen Ort zum dortigen Tagespreis (+1 / +10 / Alles). <b>ø bezahlt</b> ist dein Durchschnittseinkauf — Gewinn/Verlust steht im Log. <b>Weg</b> (Inventar) bringt kein Geld und löst mit der Polizei-%-Chance des Ortes ein Feuergefecht aus.")}</p>
+
+  <h4>${E("Reisen &amp; Ereignisse")}</h4>
+  <ul style="${U}">
+    <li>${E("Jede Reise kostet <b>einen Tag</b>. Reist du vom letzten Tag weg, endet das Spiel („Zeit um\").")}</li>
+    <li>${E("Bei jeder Reise laufen die Zinsen: Schulden + Schuldenzins %, Konto + Bankzins %.")}</li>
+    <li>${E("Huren verdienen bei jeder Reise Geld (siehe Allgemein → Huren-Felder), begrenzt pro 30-Tage-Block.")}</li>
+    <li>${E("Unterwegs kann dich ein Ereignis treffen — die Chance steigt mit deinem Vermögen: <b>Überfall</b> (80–95 % deines Bargelds — Konto bleibt sicher), <b>Kumpel</b> leiht/schenkt Waren, <b>Funde</b> auf der Straße, „Mamas Brownies\“ fressen Weed/Hasch, ein <b>Paraquat-Deal</b> (tödlich, wenn du „Ja\“ sagst!) oder du bleibst für Kleinkram stehen.")}</li>
+    <li>${E("Straßenangebot: eine Hure oder Waffe zum Zehntel des normalen Preises.")}</li>
+    <li>${E("Bei 15 % der Reisen sagt eine Dame in der Ubahn etwas Sinnfreies.")}</li>
+  </ul>
+
+  <h4>${E("Polizeikampf")}</h4>
+  <ul style="${U}">
+    <li>${E("Ausgelöst durch Reisen oder Wegwerfen (Polizei-% des Ortes). Ohne Waffe bleibt nur <b>Rennen</b>.")}</li>
+    <li>${E("<b>Feuern</b> — alle Waffen gleichzeitig. Erst fallen die Begleiter, dann der Chef-Bulle.")}</li>
+    <li>${E("<b>Rennen</b> — ca. 60 % Erfolg; misslingt es, schießt der Bulle zurück.")}</li>
+    <li>${E("Trifft dich der Bulle tödlich, opfert sich eine Hure (Gesundheit wieder 100 %) — solange du eine dabei hast. Ohne Hure: Spielende.")}</li>
+    <li>${E("<b>Chef erledigt</b> — Geld vom Leichnam; danach greift die nächstschwerere Stufe aus der Polizisten-Liste an, der letzte kehrt immer wieder.")}</li>
+    <li>${E("Danach bietet sich oft ein <b>Arzt</b> an, dich zusammenzunähen (Preis steigt mit fehlender Gesundheit).")}</li>
+  </ul>
+
+  <h4>${E("Kredithai")}</h4>
+  <p style="${P}">${E("<b>Leihen</b> — Bargeld rein, Schulden rein. <b>Zurückzahlen</b> — Betrag eingeben. <b>Alles bezahlen</b> — zahlt so viel wie möglich; fragt immer nach, weil es dich auf 0 € bringen und damit das Spiel beenden kann. Zinsen: <b>Schuldenzins %</b> pro Tag. Beträge abkürzen erlaubt: 2500, 2.5k oder 1m.")}</p>
+
+  <h4>${E("Bank")}</h4>
+  <p style="${P}">${E("<b>Einzahlen</b>/<b>Auszahlen</b>. Das Konto wächst um <b>Bankzins %</b> pro Tag und ist vor Überfällen sicher — geraubt werden kann nur Bargeld.")}</p>
+
+  <h4>${E("Waffenladen")}</h4>
+  <p style="${P}">${E("Waffen kaufen (Kaufpreis plus nötiger Platz) und <b>zum vollen Kaufpreis</b> wieder verkaufen. Mehr Waffen = mehr Feuerpower im Kampf.")}</p>
+
+  <h4>${E("Kneipe")}</h4>
+  <p style="${P}">${E("<b>Anheuern</b> — Preis zufällig zwischen <b>Hure Min-/Max-Preis</b>. Jede Hure gibt +<b>Platz pro Hure</b> Platz, verdient bei jeder Reise Geld (Min-/Max-Verdienst, Monats-Limit) und fängt einmal einen tödlichen Treffer für dich ab.")}</p>
+
+  <h4>${E("Spielende &amp; Highscores")}</h4>
+  <ul style="${U}">
+    <li>${E("Enden: <b>Zeit um</b>, <b>erschossen</b>, <b>Paraquat</b> oder <b>komplett pleite</b> (Bargeld, Konto, Waren, Waffen und Huren alles bei null).")}</li>
+    <li>${E("Punkte = Bargeld + Konto − Schulden. Negative Punkte landen nicht in der Hall of Fame.")}</li>
+    <li>${E("<b>In Highscores eintragen</b> — max. 10 Plätze. Ist die Liste voll, kommst du nur über deinen eigenen Rekord rein (dein schlechtester eigener Eintrag wird ersetzt) bzw. musst den letzten Platz überbieten.")}</li>
+    <li>${E("<b>Highscores speichern/laden</b> — Liste als Datei sichern bzw. aus einer Datei zusammenführen.")}</li>
+  </ul>
+
+  <h4>${E("Einstellungen — Allgemein")}</h4>
+  <ul style="${U}">
+    <li>${E("<b>Währungssymbol</b> — Zeichen vor allen Beträgen (€).")}</li>
+    <li>${E("<b>Tage</b> (62) — Spiellänge.")}</li>
+    <li>${E("<b>Startgeld</b> (5.000) / <b>Startschulden</b> (5.000) — Werte eines neuen Spiels.")}</li>
+    <li>${E("<b>Schuldenzins %</b> (10) — Zuwachs der Schulden pro Tag.")}</li>
+    <li>${E("<b>Bankzins %</b> (5) — Zuwachs des Kontos pro Tag.")}</li>
+    <li>${E("<b>Mantelplatz</b> (100) — Basis-Platz für Waren + Waffen.")}</li>
+    <li>${E("<b>Platz pro Hure</b> (10) — zusätzlicher Platz je Hure.")}</li>
+    <li>${E("<b>Billig-Teiler</b> (4) — Schnäppchen-Preis = Zufallspreis ÷ Teiler.")}</li>
+    <li>${E("<b>Teuer-Faktor</b> (4) — Preisexplosion = Zufallspreis × Faktor.")}</li>
+    <li>${E("<b>Spielerrüstung %</b> (100) — Schadenshöhe bei Treffern ohne Huren: je höher, desto weniger Schaden.")}</li>
+    <li>${E("<b>Huren-Rüstung %</b> (50) — dito, solange Huren dabei sind (niedriger = mehr Schaden!). Huren senken den Schaden nicht — sie fangen nur den tödlichen Treffer ab.")}</li>
+    <li>${E("<b>Hure Min-/Max-Preis</b> (2.000–50.000) — Preisspanne in der Kneipe; Arzt und Straßenangebote leiten sich daraus ab.")}</li>
+    <li>${E("<b>Hure Min-/Max-Verdienst/Tag</b> (20–2.000) — tägliches Einkommen je Hure.")}</li>
+    <li>${E("<b>Huren-Max/Monat (30 Tage)</b> (10.000) — Einkommensdeckel je 30-Tage-Block; 0 = unbegrenzt.")}</li>
+  </ul>
+
+  <h4>${E("Einstellungen — Orte, Waren, Waffen, Polizisten")}</h4>
+  <p style="${P}">${E("<b>+ Ort</b>/<b>+ Ware</b>/… hängt einen neuen Eintrag an, <b>✕</b> entfernt ihn. Bestände wandern beim Übernehmen per Name mit — entfernst du eine Ware/Waffe, ist ihr Bestand weg.")}</p>
+  <ul style="${U}">
+    <li>${E("<b>Orte</b> — <b>Name</b>; <b>Polizei %</b> (Gefahr von Bullen beim Reisen/Wegwerfen, je höher, desto gefährlicher); <b>Min-/Max Warenzahl</b> — wie viele verschiedene Waren hier angeboten werden (Zufall in der Spanne, höchstens so viele wie konfiguriert).")}</li>
+    <li>${E("<b>Waren</b> — <b>Name</b>; <b>Min-/Max-Preis</b> (tägliche Zufallsspanne); <b>Billig-Nachricht</b> (Log-Text beim Schnäppchen); <b>kann billig</b>/<b>kann teuer</b> (Teilnahme an Sonderereignissen; beide an = 50/50); <b>gefragt</b> (Häkchen: Preis liegt meist nahe am Max-Preis — je mehr Polizei am Ort, desto höher; selten bricht der Markt ein. Standard bei Crack).")}</li>
+    <li>${E("<b>Waffen</b> — <b>Name</b>, <b>Preis</b> (auch Rückkaufspreis), <b>Platz</b> (Mantel), <b>Schaden</b> (Feuerkraft im Kampf).")}</li>
+    <li>${E("<b>Polizisten</b> — die Eskalationsstufen: <b>Name</b>; <b>Rüstung %</b> (Schutz des Chefs, wenn nur noch er übrig ist) und <b>Rüstung der Polizisten %</b> (Schutz der Truppe, solange Begleiter da sind — höher = widerstandsfähiger); <b>Min-/Max Polizisten</b> (Begleiterzahl); <b>Angriffsmalus</b> (schwächt das Feuer der Bullen) und <b>Verteidigungsmalus</b> (schwächt ihre Deckung — höher = du triffst leichter).")}</li>
+  </ul>
+
+  <h4>${E("Einstellungen — Begriffe")}</h4>
+  <p style="${P}">${E("Alle Texte im Spiel nutzen diese Bezeichner: Hure/Huren, Polizist/Polizisten, <b>Akkusativ</b>-Form (für „…erschossen!\“), Kredithai, Bank, Waffenladen, Kneipe. Nach <b>Übernehmen</b> wirken sie sofort überall.")}</p>
+
+  <h4>${E("Einstellungen — Dateien")}</h4>
+  <ul style="${U}">
+    <li>${E("<b>💾/📂 Spiel speichern/laden</b> — laufendes Spiel als .json-Datei sichern bzw. laden (enthält auch die Config).")}</li>
+    <li>${E("<b>💾/📂 Highscores speichern/laden</b> — Liste sichern bzw. aus Datei zusammenführen.")}</li>
+    <li>${E("<b>💾/📂 Config speichern/laden</b> — nur die Einstellungen; eine geladene Config wird erst mit <b>Übernehmen</b> aktiv.")}</li>
+    <li>${E("<b>Reset</b> — alles auf Werkseinstellungen zurücksetzen (mit Bestätigung). Highscores bleiben erhalten.")}</li>
+    <li>${E("Ohne externe Datei liegt alles im Browser-Speicher; kann der Browser nicht speichern, erscheint eine dauerhafte Warnleiste.")}</li>
+  </ul>
+
+  <h4>${E("Einstellungen — Externe Datei")}</h4>
+  <p style="${P}">${E("Verbinde eine .json-Datei: <b>Neue Datei</b> legt sie an (empfohlen im Spielordner), <b>Einstellungen Laden</b> öffnet eine bestehende. Danach liest das Spiel Config, Highscores und Spielstand daraus und schreibt bei <b>jeder Änderung automatisch</b> zurück. <b>Extern Speichern</b> erzwingt sofortiges Schreiben — er wirkt nur bei bestehender Verbindung (Statuszeile: „Extern verbunden: …\“), sonst passiert nichts. <b>✕ Trennen</b> löst die Verbindung, ohne etwas zu löschen. Vorteil: Daten überleben Browser-Wechsel und Neuladen. Funktioniert in Chrome/Edge; andere Browser nutzen stattdessen Export/Import.")}</p>
+
+  <h4>${E("Einstellungen — Übernehmen &amp; Abbrechen")}</h4>
+  <p style="${P}">${E("<b>Übernehmen</b> macht alle Änderungen sofort aktiv, sichert sie im Browser (und in der externen Datei) und zieht laufende Bestände per Name in die neue Config um. <b>Abbrechen</b> (oder Esc / Klick außerhalb) verwirft die Änderungen dieses Dialogs. Die ✕-Buttons und +X-Buttons wirken direkt im Dialog — gespeichert wird erst mit Übernehmen.")}</p>
+
+  <div class="row"><button class="amber" onclick="renderSettings()">${E("⟲ Zurück zu den Einstellungen")}</button></div>`;
+}
+
+/* Eingaben aus dem Dialog in den Arbeitsentwurf übernehmen */
+function collectDraft(){
+  document.querySelectorAll("#mbox [data-k]").forEach(inp=>{
+    const path=inp.dataset.k.split(".");
+    let obj=cfgDraft;
+    for(let i=0;i<path.length-1;i++) obj=obj[path[i]];
+    const key=path[path.length-1];
+    if(typeof obj[key]==="boolean"){ obj[key]=inp.checked; return; }
+    if(typeof obj[key]==="number"){
+      const v=parseFloat((""+inp.value).replace(",","."));
+      obj[key]=isNaN(v)?obj[key]:v;
+    }else obj[key]=inp.value;
+  });
+}
+
+function cfgAddItem(key){
+  collectDraft();
+  const templates={
+    locations:{name:"Neuer Ort",police:5,minDrug:1,maxDrug:99},
+    drugs:{name:"Neue Ware",min:100,max:1000,cheapStr:"",cheap:true,expensive:true,hot:false},
+    guns:{name:"Neue Waffe",price:500,space:1,damage:10},
+    cops:{name:"Neuer Cop",armor:3,deputyArmor:3,minDep:2,maxDep:8,atkPen:30,defPen:30,gunIndex:0},
+  };
+  cfgDraft[key].push(JSON.parse(JSON.stringify(templates[key])));
+  renderSettings();
+}
+function cfgRemoveItem(key,i){
+  collectDraft();
+  cfgDraft[key].splice(i,1);
+  renderSettings();
+}
+
+/* Übernehmen: Bestände per Ware/Waffen-Name auf die neue Config umziehen */
+function applySettings(){
+  collectDraft();
+  const old=CFG;
+  CFG=cfgDraft; cfgDraft=null;
+  fillDefaults(CFG,BAKED_CFG);
+  migrateCfg(CFG);
+  try{ localStorage.setItem(CFGKEY,JSON.stringify(CFG)); }catch(e){}
+  applyStaticTexts();
+  updateStartText();
+  saveExternal();
+  if(S && !S.over){
+    const oldD=S.drugs.slice(), oldG=S.guns.slice();
+    S.drugs=CFG.drugs.map(d=>{
+      const i=old.drugs.findIndex(o=>o.name===d.name);
+      return i>=0?{n:oldD[i].n,paid:oldD[i].paid}:{n:0,paid:0};
+    });
+    S.guns=CFG.guns.map(g=>{
+      const i=old.guns.findIndex(o=>o.name===g.name);
+      return i>=0?oldG[i]:0;
+    });
+    if(S.loc>=CFG.locations.length)S.loc=0;
+    if(S.copLevel>=CFG.cops.length)S.copLevel=Math.max(0,CFG.cops.length-1);
+    generateMarket();
+    render();
+  }
+  closeModal(true);
+  log(E("Einstellungen übernommen."),"dim");
+}
+
+/* Config auf Werkseinstellungen zurücksetzen — erst nach Bestätigung */
+function resetCfg(){
+  openModal(`<h3>⚠ Reset</h3>
+    <p style="line-height:1.7">${E("Alle Einstellungen (Orte, Waren, Waffen, Polizisten, Begriffe, Zahlenwerte) werden auf die <b>Werkseinstellungen</b> zurückgesetzt — auch die im Browser gespeicherte Version. Deine Highscores bleiben erhalten. Ungespeicherte Änderungen in diesem Dialog gehen verloren.")}</p>
+    <p style="line-height:1.7">${E("Wirklich zurücksetzen?")}</p>
+    <div class="row"><button class="warn" onclick="resetCfgDo()">${E("Ja, zurücksetzen")}</button>
+    <button class="amber" onclick="renderSettings()">${E("Nein, abbrechen")}</button></div>`);
+}
+function resetCfgDo(){
+  CFG=JSON.parse(JSON.stringify(BAKED_CFG));
+  try{ localStorage.removeItem(CFGKEY); }catch(e){}
+  applyStaticTexts();
+  updateStartText();
+  if(S && !S.over){
+    const oldD=S.drugs.slice(), oldG=S.guns.slice();
+    S.drugs=CFG.drugs.map(d=>{
+      const i=BAKED_CFG.drugs.findIndex(o=>o.name===d.name);
+      return i>=0?{n:oldD[i].n,paid:oldD[i].paid}:{n:0,paid:0};
+    });
+    S.guns=CFG.guns.map(g=>{
+      const i=BAKED_CFG.guns.findIndex(o=>o.name===g.name);
+      return i>=0?oldG[i]:0;
+    });
+    if(S.loc>=CFG.locations.length)S.loc=0;
+    if(S.copLevel>=CFG.cops.length)S.copLevel=Math.max(0,CFG.cops.length-1);
+    generateMarket();
+    render();
+  }
+  cfgDraft=null;
+  openSettings();
+}
+
+/* ================= Dateien: Spielstand, Highscores, Config ================= */
+function downloadJSON(obj,filename){
+  try{
+    const blob=new Blob([JSON.stringify(obj,null,2)],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500);
+    return true;
+  }catch(e){
+    log(E("Speichern der Datei fehlgeschlagen."),"bad");
+    return false;
+  }
+}
+function pickJSON(cb){  const inp=document.createElement("input");
+  inp.type="file"; inp.accept=".json,application/json";
+  inp.onchange=()=>{
+    const f=inp.files && inp.files[0];
+    if(!f) return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{ cb(JSON.parse(r.result)); }
+      catch(e){ log(E("Datei konnte nicht gelesen werden."),"bad"); }
+    };
+    r.readAsText(f);
+  };
+  inp.click();
+}
+
+/* Dateistempel für Spielstände/Config-Exporte: TT-MM-JJJJ_HH-MM-SS */
+function dwStamp(){
+  const d=new Date(),p=x=>(""+x).padStart(2,"0");
+  return `${p(d.getDate())}-${p(d.getMonth()+1)}-${d.getFullYear()}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+function saveGameFile(){
+  if(!S || S.over){ log(E("Kein laufendes Spiel zum Speichern."),"bad"); return; }
+  if(downloadJSON({type:"dopewars-save",v:1,app:APP_VERSION,date:new Date().toISOString(),
+                   config:CFG,state:S},"DW-Save-"+dwStamp()+".json"))
+    log(E("Spielstand als Datei gespeichert."),"good");
+}
+function applyLoadedGame(obj){
+  if(!obj || obj.type!=="dopewars-save" || !obj.state){
+    log(E("Keine gültige Spielstand-Datei."),"bad"); return;
+  }
+  const st=JSON.parse(JSON.stringify(obj.state));
+  if(obj.config && Array.isArray(obj.config.drugs) && obj.config.drugs.length>0 &&
+     Array.isArray(obj.config.locations) && obj.config.locations.length>0){
+    CFG=JSON.parse(JSON.stringify(obj.config));
+    fillDefaults(CFG,BAKED_CFG);
+    migrateCfg(CFG);
+    try{ localStorage.setItem(CFGKEY,JSON.stringify(CFG)); }catch(e){}
+  }
+  st.day=new Date(st.day);
+  if(isNaN(st.day.getTime())) st.day=new Date(GAME_START.getTime());
+  st.over=false;
+  S=st; F=null; cfgDraft=null;
+  resizeStateToCfg(false);            // gespeicherte Marktpreise bleiben erhalten
+  el("startscreen").classList.add("hidden");
+  el("gameover").classList.add("hidden");
+  el("gamescreen").classList.remove("hidden");
+  closeModal(true);
+  applyStaticTexts();
+  updateStartText();
+  log(E("Spielstand geladen."),"good");
+  render();
+}
+function loadGameFile(){ pickJSON(applyLoadedGame); }
+
+function resizeStateToCfg(regenMarket){
+  while(S.drugs.length<CFG.drugs.length)S.drugs.push({n:0,paid:0});
+  S.drugs.length=CFG.drugs.length;
+  while(S.guns.length<CFG.guns.length)S.guns.push(0);
+  S.guns.length=CFG.guns.length;
+  while(S.market.length<CFG.drugs.length)S.market.push({price:0,deal:0});
+  S.market.length=CFG.drugs.length;
+  if(S.loc>=CFG.locations.length)S.loc=0;
+  if(S.copLevel>=CFG.cops.length)S.copLevel=Math.max(0,CFG.cops.length-1);
+  if(regenMarket) generateMarket();   // nur wenn sich die Config geändert hat
+}
+
+function exportScores(){
+  if(downloadJSON({type:"dopewars-hiscores",app:APP_VERSION,scores:loadScores()},"DW-HS-"+dwStamp()+".json"))
+    log(E("Highscores als Datei gespeichert."),"good");
+}
+function applyScoreImport(obj){
+  if(!obj || !Array.isArray(obj.scores)){
+    log(E("Keine gültige Highscore-Datei."),"bad"); return;
+  }
+  const top=normalizeScores(loadScores().concat(obj.scores));
+  try{ localStorage.setItem(HIKEY,JSON.stringify(top)); }catch(e){}
+  renderScoreTable(el("startscores"),null);
+  renderScoreTable(el("goscores"),null);
+  saveExternal();
+  log(E("Highscores geladen ({0} Einträge, Liste jetzt {1}).",obj.scores.length,top.length),"good");
+}
+function importScores(){ pickJSON(applyScoreImport); }
+
+function exportCfg(){
+  if(downloadJSON({type:"dopewars-config",app:APP_VERSION,config:CFG},"DW-CFG-"+dwStamp()+".json"))
+    log(E("Config als Datei gespeichert."),"good");
+}
+function importCfg(){
+  pickJSON(obj=>{
+    const c=obj && obj.config ? obj.config : obj;
+    if(!c || !Array.isArray(c.drugs) || !Array.isArray(c.locations) ||
+       c.drugs.length===0 || c.locations.length===0){
+      log(E("Keine gültige Config-Datei."),"bad"); return;
+    }
+    cfgDraft=JSON.parse(JSON.stringify(c));
+    renderSettings();
+    log(E("Config geladen — prüfe die Werte und klicke „Übernehmen“."),"dim");
+  });
+}
+
+/* ================= Externe Speicherdatei (Edge/Chrome) =================
+   Einmal verbinden (dopewars-daten.json im Spielordner ablegen): Danach
+   lädt das Spiel beim Start Config+Highscores aus der Datei und schreibt
+   bei jeder Änderung sofort zurück. Handle bleibt im Browser (IndexedDB)
+   erhalten. Browser ohne Datei-API nutzen weiterhin Export/Import. */
+let extHandle=null;
+
+function idbOpen(){
+  return new Promise((res,rej)=>{
+    try{
+      const r=indexedDB.open("dopewars",1);
+      r.onupgradeneeded=()=>{ r.result.createObjectStore("kv"); };
+      r.onsuccess=()=>res(r.result);
+      r.onerror=()=>rej(r.error);
+    }catch(e){ rej(e); }
+  });
+}
+async function idbSet(k,v){ const db=await idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction("kv","readwrite");
+    tx.objectStore("kv").put(v,k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+async function idbGet(k){ const db=await idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction("kv","readonly");
+    const rq=tx.objectStore("kv").get(k); rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(tx.error); }); }
+async function idbDel(k){ const db=await idbOpen();
+  return new Promise((res,rej)=>{ const tx=db.transaction("kv","readwrite");
+    tx.objectStore("kv").delete(k); tx.oncomplete=()=>res(); tx.onerror=()=>rej(tx.error); }); }
+
+function externalData(){
+  const d={ type:"dopewars-daten", v:1, app:APP_VERSION, saved:new Date().toISOString(),
+            config:CFG, scores:loadScores() };
+  if(S && !S.over) d.state=S;                 // laufendes Spiel mitsichern
+  return d;
+}
+async function extPermitted(){
+  if(!extHandle) return false;
+  try{
+    let p=await extHandle.queryPermission({mode:"readwrite"});
+    if(p!=="granted") p=await extHandle.requestPermission({mode:"readwrite"});
+    return p==="granted";
+  }catch(e){ return false; }
+}
+async function loadExternal(){
+  if(!extHandle || !(await extPermitted())) return;
+  try{
+    const file=await extHandle.getFile();
+    applyExternalData(JSON.parse(await file.text()));
+  }catch(e){ log(E("Externe Datei konnte nicht gelesen werden."),"bad"); }
+}
+async function saveExternal(){
+  if(!extHandle || !(await extPermitted())) return;
+  try{
+    const w=await extHandle.createWritable();
+    await w.write(JSON.stringify(externalData(),null,2));
+    await w.close();
+  }catch(e){ log(E("Externe Datei konnte nicht geschrieben werden."),"bad"); }
+}
+function applyExternalData(data){
+  if(!data) return;
+  if(data.config && Array.isArray(data.config.drugs) && data.config.drugs.length>0 &&
+     Array.isArray(data.config.locations) && data.config.locations.length>0){
+    CFG=JSON.parse(JSON.stringify(data.config));
+    fillDefaults(CFG,BAKED_CFG);
+    migrateCfg(CFG);
+    try{ localStorage.setItem(CFGKEY,JSON.stringify(CFG)); }catch(e){}
+    updateStartText();
+  }
+  if(Array.isArray(data.scores)){
+    applyScoreImport({scores:data.scores});
+  }
+  if(data.state && data.state.turn){
+    let a=null;
+    try{ a=JSON.parse(localStorage.getItem(AUTOSAVE_KEY)||"null"); }catch(e){}
+    if(!a || !a.state){                     // externen Spielstand als Fortsetzpunkt übernehmen
+      try{ localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({
+        type:"dopewars-autosave",v:1,saved:data.saved||"",config:CFG,state:data.state})); }catch(e){}
+    }
+  }
+  updateResumeBtn();
+  if(S && !S.over) render();
+}
+async function connectExternalOpen(){
+  if(!window.showOpenFilePicker){ pickJSON(applyExternalData); return; }
+  try{
+    const [handle]=await window.showOpenFilePicker({
+      types:[{description:"Dopewars-Daten",accept:{"application/json":[".json"]}}]
+    });
+    extHandle=handle;
+    try{ await idbSet("daten",handle); }catch(e){}
+    await loadExternal();
+    await saveExternal();
+  }catch(e){ pickJSON(applyExternalData); }
+}
+async function connectExternalNew(){
+  if(!window.showSaveFilePicker){ connectExternalOpen(); return; }
+  try{
+    extHandle=await window.showSaveFilePicker({
+      suggestedName:"dopewars-daten.json",
+      types:[{description:"Dopewars-Daten",accept:{"application/json":[".json"]}}]
+    });
+    try{ await idbSet("daten",extHandle); }catch(e){}
+    await loadExternal();
+    await saveExternal();
+  }catch(e){ /* abgebrochen */ }
+  updateExtStatus();
+}
+async function disconnectExternal(){
+  extHandle=null;
+  try{ await idbDel("daten"); }catch(e){}
+  updateExtStatus();
+}
+function updateExtStatus(){
+  const supported=!!(window.showOpenFilePicker&&window.showSaveFilePicker);
+  const txt=!supported
+    ?E("Datei-Sync wird von diesem Browser nicht unterstützt (Export/Import nutzen).")
+    :extHandle?E("Extern verbunden: {0}",extHandle.name)
+    :E("Nicht verbunden (nur Browser-Speicher).");
+  document.querySelectorAll(".extstatus").forEach(e=>e.textContent=txt);
+  document.querySelectorAll(".extconnect").forEach(b=>b.style.display=(!supported||extHandle)?"none":"");
+  document.querySelectorAll(".extdisconnect").forEach(b=>b.style.display=extHandle?"":"none");
+}
+(async function(){                       // gespeicherte Verbindung beim Start aufnehmen
+  try{
+    const h=await idbGet("daten");
+    if(h){ extHandle=h;
+      if((await extHandle.queryPermission({mode:"readwrite"}))==="granted"){
+        await loadExternal();
+        await saveExternal();
+      }
+    }
+  }catch(e){}
+  updateExtStatus();
+  autoRestoreIfAny();          // laufendes Spiel beim Neuladen automatisch fortsetzen
+})();
+
+/* ================= Auto-Speicherung des laufenden Spiels =================   Nach jeder Aktion (Reise, Handel, Kämpfe ...) wandert der Stand in den
+   Browser-Speicher; beim Start erscheint dann "Spiel fortsetzen". Ist die
+   externe Datei verbunden, wandert der Stand auch dorthin. */
+const AUTOSAVE_KEY="dopewars.frankfurt.autosave";
+
+function saveAutosave(){
+  if(!S || S.over) return;
+  try{
+    localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({
+      type:"dopewars-autosave",v:1,saved:new Date().toISOString(),config:CFG,state:S}));
+  }catch(e){}
+  saveExternal();
+}
+function clearAutosave(){
+  try{ localStorage.removeItem(AUTOSAVE_KEY); }catch(e){}
+  updateResumeBtn();
+}
+function updateResumeBtn(){
+  const btn=el("resumeBtn");
+  if(!btn) return;
+  let a=null;
+  try{ a=JSON.parse(localStorage.getItem(AUTOSAVE_KEY)||"null"); }catch(e){}
+  const show=!!(a && a.state && !a.state.over);
+  btn.style.display=show?"":"none";
+  const row=el("resumerow");
+  if(row) row.style.display=show?"":"none";
+  if(show){
+    const ort=a.state.loc<CFG.locations.length?lnm(a.state.loc):"?";
+    btn.textContent=E("▶ Spiel fortsetzen — Tag {0}, {1}",a.state.turn,ort);
+  }
+}
+function resumeGame(){
+  let a=null;
+  try{ a=JSON.parse(localStorage.getItem(AUTOSAVE_KEY)||"null"); }catch(e){}
+  if(!a || !a.state){ updateResumeBtn(); return; }
+  restoreState(a);
+  log(E("Spiel fortgesetzt."),"good");
+}
+/* Spielstand automatisch beim Laden des Browsers wiederherstellen */
+function autoRestoreIfAny(){
+  let a=null;
+  try{ a=JSON.parse(localStorage.getItem(AUTOSAVE_KEY)||"null"); }catch(e){}
+  if(a && a.state && !a.state.over){
+    restoreState(a);
+    log(E("Spiel automatisch wiederhergestellt — weiter geht's!"),"good");
+    return true;
+  }
+  updateResumeBtn();          // Startbildschirm-Fall: Button anbieten
+  return false;
+}
+function restoreState(a){
+  /* Die im Autosave mitgeparkte Config bewusst NICHT zurückladen: Sie wäre
+     älter als die aktuelle Einstellung und würde frische Änderungen stumm
+     überschreiben (z. B. "Tage" 365 → wieder 62). Der Spielstand wird mit
+     resizeStateToCfg an die aktuelle Config angepasst. */
+  const st=JSON.parse(JSON.stringify(a.state));
+  st.day=new Date(st.day);
+  if(isNaN(st.day.getTime())) st.day=new Date(GAME_START.getTime());
+  st.over=false;
+  S=st; F=null;
+  resizeStateToCfg(false);            // gespeicherte Marktpreise bleiben erhalten
+  applyStaticTexts();                 // Sprache der (ggf. geladenen) Config anwenden
+  updateStartText();
+  el("startscreen").classList.add("hidden");
+  el("gameover").classList.add("hidden");
+  el("gamescreen").classList.remove("hidden");
+  closeModal(true);
+  render();
+}
+/* Neues Spiel aus dem laufenden Spiel heraus (mit Bestätigung) */
+function askNewGame(){
+  window._newName=S.name;
+  openModal(`<h3>${E("✚ Neues Spiel")}</h3>
+    <p style="line-height:1.7">${E("Das aktuelle Spiel (Tag {0}) wird dabei <b>überschrieben</b> — falls es dir wichtig ist, vorher 💾 Spiel speichern!",S.turn)}</p>
+    <input id="newname" maxlength="20" placeholder="${E("Dein Name")}" value="${esc(S.name)}">
+    <div class="row"><button class="warn" onclick="newGameDo()">${E("Ja, neu anfangen")}</button>
+    <button class="amber" onclick="closeModal()">${E("Abbrechen")}</button></div>`);
+}
+function newGameDo(){
+  const nEl=el("newname");
+  const name=nEl?nEl.value:S.name;
+  clearAutosave();
+  closeModal(true);
+  newGame(name);
+}
+function renderLog(){
+  el("log").innerHTML=LOG.map(m=>`<p class="${m.c}">${m.t}</p>`).join("");
+  const l=el("log"); l.scrollTop=l.scrollHeight;
+}
+/* Mobil: Platz unter dem Inhalt für die feststehende Aktionsleiste freihalten */
+function syncActionPad(){
+  const ap=el("actionpanel"), main=el("main");
+  if(!ap||!main) return;
+  main.style.paddingBottom=(window.innerWidth<=980)?(ap.offsetHeight+26)+"px":"";
+}
+window.addEventListener("resize",syncActionPad);
+function render(){
+  if(!S) return;
+  const loc=CFG.locations[S.loc];
+  el("topbar").innerHTML=
+    `<span class="brand">DOPE<b>WARS</b></span>
+     <span>${E("Tag <b>{0}</b>/{1}",S.turn,CFG.numTurns)}</span>
+     <span class="dim">${fmtDate(S.day)}</span>
+     <span>${lnm(S.loc)}</span>
+     <span>${nm("bitches")}: <b>${S.bitches}</b></span>
+     <span class="dim">${E("Platz frei: {0}/{1}",freeSpace(),totalSpace())}</span>
+     <button class="cfgbtn" onclick="openSettings()" title="Einstellungen">⚙</button>
+     <select class="themesel" onchange="applyTheme(this.value)">${
+       Object.keys(THEMES).map(k=>
+         `<option value="${k}"${document.documentElement.dataset.theme===k?" selected":""}>${THEMES[k].label}</option>`).join("")
+     }</select>
+     <button title="${E("Laufendes Spiel als DW-Save-Datei speichern")}" onclick="saveGameFile()">${E("💾 Spiel speichern")}</button>
+     <button title="${E("Spielstand aus Datei laden und weiterspielen — ersetzt das laufende Spiel")}" onclick="loadGameFile()">${E("📂 Spiel laden")}</button>
+     <button title="${E("Aktuelles Spiel beenden und neu beginnen")}" onclick="askNewGame()">${E("✚ Neu")}</button>`;
+  el("stats").innerHTML=
+    `<div class="stat"><span>${E("Bargeld")}</span><span class="v">${fmt(S.cash)}</span></div>
+     <div class="stat"><span>${E("Bankkonto")}</span><span class="v">${fmt(S.bank)}</span></div>
+     <div class="stat"><span>${E("Schulden")}</span><span class="v" style="color:var(--danger)">${fmt(S.debt)}</span></div>
+     <div class="stat"><span>${E("Gesundheit")}</span><span class="v">${S.health}%</span></div>
+     <div class="bar"><i class="${S.health<40?"low":""}" style="width:${S.health}%"></i></div>
+     <div class="stat" style="margin-top:8px"><span>${E("Waffen")}</span><span class="v">${
+       gunsTotal()?CFG.guns.map((g,i)=>S.guns[i]?`${gnm(i)}×${S.guns[i]}`:"").filter(Boolean).join(", "):E("keine")}</span></div>`;
+  const carried=S.drugs.map((d,i)=>({d,i})).filter(x=>x.d.n>0);
+  el("inv").innerHTML=carried.length
+    ?`<table><tr><th>${E("Ware")}</th><th class="num">${E("Menge")}</th><th class="num">${E("ø bezahlt")}</th><th></th></tr>${
+      carried.map(x=>`<tr><td>${dn(x.i)}</td><td class="num">${x.d.n}</td>
+        <td class="num small">${fmt(x.d.paid||0)}</td>
+        <td class="num"><button title="${E("Ware wegwerfen — bringt kein Geld, Bullen-Risiko")}" onclick="showDrop(${x.i})">${E("Weg")}</button></td></tr>`).join("")}</table>`
+    :`<div class="small">${E("Dein Mantel ist leer.")}</div>`;
+  el("marketname").textContent=E("Markt: {0}",lnm(S.loc));
+  el("marketcash").textContent=fmt(S.cash);
+  const ss=el("sortsel"); if(ss) ss.value=sortMode;
+  const listed=S.market.map((m,i)=>({m,i})).filter(x=>x.m.price>0);
+  if(sortMode==="name") listed.sort((a,b)=>dn(a.i).localeCompare(dn(b.i),CFG.lang==="en"?"en":"de"));
+  else if(sortMode==="namedown") listed.sort((a,b)=>dn(b.i).localeCompare(dn(a.i),CFG.lang==="en"?"en":"de"));
+  else if(sortMode==="priceup") listed.sort((a,b)=>a.m.price-b.m.price);
+  else if(sortMode==="pricedown") listed.sort((a,b)=>b.m.price-a.m.price);
+  el("market").innerHTML=listed.length
+    ?`<table><tr>${sortHeader(E("Ware"),"name")}${sortHeader(E("Preis"),"price","num")}<th class="num"></th></tr>${
+      listed.map(x=>`<tr><td>${dn(x.i)}</td>
+        <td class="num ${x.m.deal===1?"deal-cheap":x.m.deal===2?"deal-exp":""}">${fmt(x.m.price)}</td>
+        <td class="num btnrow">
+          <button title="${E("{0} zum aktuellen Preis kaufen",dn(x.i))}" onclick="showBuy(${x.i})">${E("Kaufen")}</button>
+          <button ${S.drugs[x.i].n>0?"":"disabled"} title="${E("{0} hier zum aktuellen Preis verkaufen",dn(x.i))}" onclick="showSell(${x.i})">${E("Verkaufen")}</button>
+        </td></tr>`).join("")}</table>`
+    :`<div class="small">${E("Hier wird heute nichts gehandelt. Reise weiter!")}</div>`;
+  const b=[];
+  b.push(`<button class="amber" title="${E("Zu einem anderen Ort reisen — kostet einen Tag")}" onclick="showTravel()">${E("Reisen")}</button>`);
+  b.push(`<button title="${E("Schulden zurückzahlen oder Geld leihen (Zinsen: {0}% pro Tag)",CFG.debtInterest)}" onclick="showLoan()">${E("Kredithai")}</button>`);
+  b.push(`<button title="${E("Geld einzahlen/abheben — vor Räubern sicher, {0}% Zinsen pro Tag",CFG.bankInterest)}" onclick="showBank()">${E("Bank")}</button>`);
+  b.push(`<button title="${E("Waffen kaufen und verkaufen")}" onclick="showGunShop()">${E("Waffenladen")}</button>`);
+  b.push(`<button title="${E("{0} anheuern — +{1} Platz, rettet einmal das Leben",nm("bitches"),CFG.bitchSpace)}" onclick="showPub()">${E("Kneipe")}</button>`);
+  el("actions").innerHTML=b.join("");
+  checkBroke();
+  saveAutosave();
+  renderLog();
+  syncActionPad();
+}
+
+/* Statische Rahmentexte (Startbildschirm, Panels, Game Over) in der
+   eingestellten Sprache setzen — nach einem Sprachwechsel erneut aufrufen;
+   danach updateStartText() nicht vergessen (spans werden neu angelegt). */
+function applyStaticTexts(){
+  document.documentElement.lang=CFG.lang;
+  document.title=CFG.lang==="en"?"Dope Wars – Frankfurt Edition":"Dopewars – Frankfurt Edition";
+  el("thmlabel").textContent="Theme:";
+  el("rulesbox").innerHTML=CFG.lang==="en"
+    ?`<b>The rules of the street:</b> You start with <b id="txt_cash"></b> cash and
+    <b id="txt_debt"></b> of debt at the loan shark. Buy drugs cheap, travel to the next
+    location and sell them expensive. Prices change every day — sometimes there are
+    bargains (“LSD from the Netherlands has arrived!”), sometimes prices explode
+    because the cops made a huge bust.<br><br>
+    Watch your <b>bank balance</b>: only your cash can be stolen! Your <b>debt</b>
+    grows by 10% interest every day — pay it back at the loan shark, or the interest
+    will eat you.<br><br>
+    The <b>police</b> are everywhere. Without a gun you can only run. With guns you
+    can fight back — but if you take out a cop, a harder one comes after him. Your
+    <b>coat</b> holds 100 units — you can always buy as much as cash and space allow.
+    <b>Hookers</b> carry 10 units each for you and save your life once. You have
+    <b id="txt_days"></b>. If cash and account are at zero and you have neither drugs
+    nor guns, it is <b>game over</b>. Your score: cash + account − debt.`
+    :`<b>Die Regeln der Straße:</b> Du beginnst mit <b id="txt_cash"></b> Bargeld und
+    <b id="txt_debt"></b> Schulden beim Kredithai. Kaufe die Waren billig, reise zum nächsten
+    Ort und verkaufe sie teuer. Die Preise schwanken täglich — manchmal gibt es
+    Schnäppchen („LSD aus NL ist eingetroffen!“), manchmal explodieren die Preise,
+    weil die Bullen eine große Beschlagnahme gemacht haben.<br><br>
+    Achte auf dein <b>Guthaben bei der Bank</b>: Überfallen werden
+    nur dein Bargeld! Deine <b>Schulden</b> wachsen jeden Tag um 10% Zinsen —
+    zahl sie beim Kredithai zurück, sonst frisst dich der Zins.<br><br>
+    Die <b>Polizei</b> ist überall. Ohne Waffe kannst du nur rennen. Mit Waffen
+    kannst du dich wehren — aber wenn du einen Bullen erledigst, kommt ein
+    härterer nach. Dein <b>Mantel</b> fasst 100 Einheiten — kaufen kannst du
+    immer so viel, wie Bargeld und Platz hergeben. <b>Huren</b> tragen
+    je 10 Einheiten für dich und retten dir einmal das Leben. Du hast
+    <b id="txt_days"></b>. Sind Bargeld und Konto auf null und du hast weder
+    Waren noch Waffen, ist das <b>Spiel vorbei</b>. Dann zählt:
+    Bargeld + Konto − Schulden.`;
+  el("pname").placeholder=E("Dein Name");
+  el("btnStart").textContent=E("Spiel starten");
+  el("btnStart").title=E("Neues Spiel mit Werkseinstellungen bzw. aktuellen Einstellungen beginnen");
+  el("btnLoadStart").textContent=E("📂 Spielstand laden");
+  el("btnLoadStart").title=E("Gespeicherten Spielstand aus einer Datei laden");
+  el("btnCfgStart").textContent=E("⚙ Einstellungen");
+  el("btnCfgStart").title=E("Alle Spielwerte konfigurieren (Orte, Waren, Waffen, Polizisten …)");
+  el("extOpenStart").textContent=E("Einstellungen Laden");
+  el("extNewStart").textContent=E("Neue Datei");
+  el("extDiscStart").textContent=E("✕ Trennen");
+  el("extSaveStart").textContent=E("Extern Speichern");
+  el("invtitle").textContent=E("Inventar");
+  el("logtitle").textContent=E("Meldungen");
+  el("actiontitle").textContent=E("Aktionen");
+  el("sortlabel").textContent=E("Sortieren");
+  el("marketcash").title=E("Bargeld");
+  const sortTexts={name:"Name A–Z",namedown:"Name Z–A",priceup:"Preis aufsteigend",pricedown:"Preis absteigend"};
+  Array.from(el("sortsel").options).forEach(o=>{
+    if(sortTexts[o.value]!==undefined) o.textContent=E(sortTexts[o.value]);
+  });
+  el("goendstand").textContent=E("Endstand");
+  el("goname").placeholder=E("Dein Name");
+  el("btnGoSave").textContent=E("In Highscores eintragen");
+  el("btnGoSave").title=E("Endstand in die Hall of Fame eintragen");
+  el("btnGoExport").textContent=E("💾 Highscores speichern");
+  el("btnGoCfg").textContent=E("⚙ Einstellungen");
+  el("btnGoNew").textContent=E("Neues Spiel");
+  el("btnGoNew").title=E("Spiel neu beginnen");
+}
+/* Werte im Startbildschirm-Text aktualisieren (Config ist editierbar) */
+function updateStartText(){
+  el("txt_cash").textContent=fmt(CFG.startCash);
+  el("txt_debt").textContent=fmt(CFG.startDebt);
+  el("txt_days").textContent=E("{0} Tage",CFG.numTurns);
+}
+
+/* Highscores auf dem Startbildschirm */
+applyStaticTexts();
+updateStartText();
+el("appver").textContent="Version "+APP_VERSION;
+el("titleicon").innerHTML=iconFavicon();
+el("sortsel").value=sortMode;
+updateResumeBtn();
+try{ localStorage.setItem(HIKEY,JSON.stringify(loadScores())) }catch(e){}   // Altbestand bereinigen
+renderScoreTable(el("startscores"),null);
+/* Speicher-Fähigkeit prüfen — sonst dauerhafte Warnleiste */
+(function(){
+  let ok=true;
+  try{ localStorage.setItem("dopewars.test","1"); localStorage.removeItem("dopewars.test"); }
+  catch(e){ ok=false; }
+  if(!ok){
+    const w=document.createElement("div");
+    w.style.cssText="position:fixed;top:0;left:0;right:0;z-index:999;background:var(--danger);color:#fff;padding:6px 12px;font-size:13px;text-align:center;font-weight:bold";
+    w.textContent=E("⚠ Speichern nicht möglich — Fortschritt geht bei Neuladen verloren! ⚙ → Dateien → externe Datei verbinden.");
+    document.body.appendChild(w);
+  }
+})();
+</script>
+</body>
+</html>
